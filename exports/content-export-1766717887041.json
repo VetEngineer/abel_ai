@@ -1,0 +1,112 @@
+{
+  "workflows": {
+    "workflow_1766717846511": {
+      "id": "workflow_1766717846511",
+      "content_id": "content_1766717846440",
+      "project_id": "550e8400-e29b-41d4-a716-446655440001",
+      "status": "completed",
+      "current_step": 11,
+      "total_steps": 11,
+      "shared_context": {
+        "keywords": [],
+        "targetAudience": "허리가 아픈 사람들",
+        "contentGoal": "engagement",
+        "brandTone": "전문적인",
+        "platform": "blog"
+      },
+      "agent_executions": [
+        {
+          "agent_type": "trend_keyword",
+          "status": "completed",
+          "execution_time": 662,
+          "tokens_used": 579
+        },
+        {
+          "agent_type": "content_planning",
+          "status": "completed",
+          "execution_time": 624,
+          "tokens_used": 241
+        },
+        {
+          "agent_type": "seo_optimization",
+          "status": "completed",
+          "execution_time": 1017,
+          "tokens_used": 160
+        },
+        {
+          "agent_type": "copywriting",
+          "status": "completed",
+          "execution_time": 2053,
+          "tokens_used": 261
+        },
+        {
+          "agent_type": "content_writing",
+          "status": "completed",
+          "execution_time": 571,
+          "tokens_used": 150
+        },
+        {
+          "agent_type": "visual_design",
+          "status": "completed",
+          "execution_time": 676,
+          "tokens_used": 429
+        },
+        {
+          "agent_type": "local_seo",
+          "status": "completed",
+          "execution_time": 530,
+          "tokens_used": 251
+        },
+        {
+          "agent_type": "answer_optimization",
+          "status": "completed",
+          "execution_time": 3227,
+          "tokens_used": 413
+        },
+        {
+          "agent_type": "marketing_funnel",
+          "status": "completed",
+          "execution_time": 1483,
+          "tokens_used": 172
+        },
+        {
+          "agent_type": "brand_supervision",
+          "status": "completed",
+          "execution_time": 2385,
+          "tokens_used": 400
+        },
+        {
+          "agent_type": "blog_deployment",
+          "status": "completed",
+          "execution_time": 3415,
+          "tokens_used": 180
+        }
+      ],
+      "created_at": "2025-12-26T02:57:26.511Z",
+      "content": {
+        "title": "허리통증 - 자동 생성 콘텐츠",
+        "status": "draft"
+      },
+      "completed_at": "2025-12-26T02:57:48.750Z"
+    }
+  },
+  "contents": {
+    "content_1766717846440": {
+      "id": "content_1766717846440",
+      "project_id": "550e8400-e29b-41d4-a716-446655440001",
+      "title": "허리통증 - 자동 생성 콘텐츠",
+      "excerpt": "허리통증 - 자동 생성 콘텐츠에 대한 자동 생성된 요약입니다.",
+      "status": "draft",
+      "keywords": [],
+      "tags": [],
+      "platforms": [],
+      "created_at": "2025-12-26T02:57:26.440Z",
+      "updated_at": "2025-12-26T02:57:26.440Z"
+    }
+  },
+  "summary": {
+    "totalWorkflows": 1,
+    "totalContents": 1,
+    "exportedAt": "2025-12-26T02:58:07.041Z"
+  }
+}
