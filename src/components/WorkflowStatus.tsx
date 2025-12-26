@@ -23,6 +23,25 @@ interface WorkflowData {
     tokens_used?: number
     error_message?: string
   }>
+  final_result?: {
+    content?: {
+      title?: string
+      introduction?: string
+      mainSections?: Array<{
+        title: string
+        content: string
+        keyPoints?: string[]
+      }>
+      conclusion?: string
+      fullContent?: string
+    }
+    writingMetrics?: {
+      wordCount?: number
+      readabilityScore?: number
+      seoScore?: number
+      keywordDensity?: number
+    }
+  }
 }
 
 export default function WorkflowStatus({ workflowId }: WorkflowStatusProps) {
@@ -32,7 +51,7 @@ export default function WorkflowStatus({ workflowId }: WorkflowStatusProps) {
   useEffect(() => {
     const fetchWorkflowStatus = async () => {
       try {
-        const response = await fetch(`/api/demo/workflows?workflowId=${workflowId}`)
+        const response = await fetch(`/api/workflows?workflowId=${workflowId}`)
         const data = await response.json()
         setWorkflow(data.workflow)
       } catch (error) {
@@ -127,6 +146,139 @@ export default function WorkflowStatus({ workflowId }: WorkflowStatusProps) {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {workflow.status === 'completed' && workflow.final_result && (
+        <div className="mt-6 border-t pt-6">
+          <h4 className="text-lg font-semibold mb-4 text-green-600">🎉 콘텐츠 생성 완료!</h4>
+
+          {workflow.final_result.content && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+              <div className="mb-4">
+                <h5 className="font-medium text-lg mb-2">생성된 콘텐츠</h5>
+                {workflow.final_result.content.title && (
+                  <h6 className="text-xl font-bold mb-3 text-gray-800">
+                    {workflow.final_result.content.title}
+                  </h6>
+                )}
+              </div>
+
+              {workflow.final_result.content.introduction && (
+                <div className="mb-4">
+                  <h6 className="font-medium text-sm text-gray-600 mb-2">도입부</h6>
+                  <p className="text-gray-800 leading-relaxed">{workflow.final_result.content.introduction}</p>
+                </div>
+              )}
+
+              {workflow.final_result.content.mainSections && Array.isArray(workflow.final_result.content.mainSections) && (
+                <div className="mb-4">
+                  <h6 className="font-medium text-sm text-gray-600 mb-2">주요 섹션</h6>
+                  <div className="space-y-4">
+                    {workflow.final_result.content.mainSections.map((section: any, index: number) => (
+                      <div key={index} className="bg-white p-4 rounded border">
+                        <h6 className="font-semibold text-gray-800 mb-2">{section.title}</h6>
+                        <p className="text-gray-700 mb-2">{section.content}</p>
+                        {section.keyPoints && (
+                          <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
+                            {section.keyPoints.map((point: string, pointIndex: number) => (
+                              <li key={pointIndex}>{point}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {workflow.final_result.content.conclusion && (
+                <div className="mb-4">
+                  <h6 className="font-medium text-sm text-gray-600 mb-2">결론</h6>
+                  <p className="text-gray-800 leading-relaxed">{workflow.final_result.content.conclusion}</p>
+                </div>
+              )}
+
+              {workflow.final_result.content.fullContent && (
+                <div className="mb-4">
+                  <h6 className="font-medium text-sm text-gray-600 mb-2">전체 콘텐츠</h6>
+                  <div className="bg-white p-4 rounded border max-h-96 overflow-y-auto">
+                    <pre className="whitespace-pre-wrap text-sm text-gray-800 font-sans leading-relaxed">
+                      {workflow.final_result.content.fullContent}
+                    </pre>
+                  </div>
+                </div>
+              )}
+
+              {workflow.final_result.writingMetrics && (
+                <div className="mt-4 pt-4 border-t border-green-300">
+                  <h6 className="font-medium text-sm text-gray-600 mb-2">콘텐츠 통계</h6>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    {workflow.final_result.writingMetrics.wordCount && (
+                      <div className="text-center">
+                        <div className="font-semibold text-lg text-green-600">
+                          {workflow.final_result.writingMetrics.wordCount.toLocaleString()}
+                        </div>
+                        <div className="text-gray-500">단어 수</div>
+                      </div>
+                    )}
+                    {workflow.final_result.writingMetrics.readabilityScore && (
+                      <div className="text-center">
+                        <div className="font-semibold text-lg text-green-600">
+                          {workflow.final_result.writingMetrics.readabilityScore}%
+                        </div>
+                        <div className="text-gray-500">가독성</div>
+                      </div>
+                    )}
+                    {workflow.final_result.writingMetrics.seoScore && (
+                      <div className="text-center">
+                        <div className="font-semibold text-lg text-green-600">
+                          {workflow.final_result.writingMetrics.seoScore}%
+                        </div>
+                        <div className="text-gray-500">SEO 점수</div>
+                      </div>
+                    )}
+                    {workflow.final_result.writingMetrics.keywordDensity && (
+                      <div className="text-center">
+                        <div className="font-semibold text-lg text-green-600">
+                          {workflow.final_result.writingMetrics.keywordDensity}%
+                        </div>
+                        <div className="text-gray-500">키워드 밀도</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-4 pt-4 border-t border-green-300 flex flex-wrap gap-2">
+                <button
+                  className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                  onClick={() => {
+                    const content = workflow.final_result?.content?.fullContent || '콘텐츠를 찾을 수 없습니다.'
+                    navigator.clipboard.writeText(content)
+                    alert('콘텐츠가 클립보드에 복사되었습니다!')
+                  }}
+                >
+                  📋 복사하기
+                </button>
+                <button
+                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                  onClick={() => {
+                    const content = workflow.final_result?.content?.fullContent || '콘텐츠를 찾을 수 없습니다.'
+                    const blob = new Blob([content], { type: 'text/plain' })
+                    const url = URL.createObjectURL(blob)
+                    const a = document.createElement('a')
+                    a.href = url
+                    a.download = `${workflow.content?.title || 'generated-content'}.txt`
+                    a.click()
+                    URL.revokeObjectURL(url)
+                  }}
+                >
+                  📁 다운로드
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

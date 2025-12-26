@@ -53,11 +53,25 @@ export const getBrowserSupabaseClient = () => {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://demo.supabase.co'
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'demo_anon_key'
 
+  // Supabase가 제대로 설정되지 않은 경우 null 반환
+  if (!supabaseUrl.startsWith('http') || supabaseUrl === 'your_supabase_project_url') {
+    console.warn('Supabase가 설정되지 않았습니다. Supabase 기능을 비활성화합니다.')
+    return null
+  }
+
   return createClient(supabaseUrl, supabaseAnonKey)
 }
 
-// 기존 호환성을 위한 export
-export const supabase = getBrowserSupabaseClient()
+// 기존 호환성을 위한 export (지연 로딩)
+export let supabase: any = null
+
+// 지연 초기화
+try {
+  supabase = getBrowserSupabaseClient()
+} catch (error) {
+  console.warn('Supabase 초기화 실패:', error)
+  supabase = null
+}
 
 // 서버사이드에서 사용할 클라이언트 (MCP 기반)
 export const createServiceSupabaseClient = getMCPSupabaseClient

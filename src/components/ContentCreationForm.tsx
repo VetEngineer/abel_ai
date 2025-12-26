@@ -47,8 +47,8 @@ export default function ContentCreationForm({ projectId, onWorkflowCreated }: Co
         throw new Error(contentData.error || '콘텐츠 생성 실패')
       }
 
-      // 워크플로우 시작 (데모 API 사용)
-      const workflowResponse = await fetch('/api/demo/workflows', {
+      // 워크플로우 시작 (실제 AI API 사용)
+      const workflowResponse = await fetch('/api/workflows', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -1,4 +1,4 @@
-import { getMCPSupabaseClient } from '@/lib/supabase/client'
+// import { getMCPSupabaseClient } from '@/lib/supabase/client' // 임시로 비활성화
 
 export interface AdminStats {
   totalUsers: number
