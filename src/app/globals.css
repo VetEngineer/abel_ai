@@ -4,78 +4,67 @@
 
 @layer base {
   :root {
-    /* 라이트 테마 - 그린 제이드 + 따뜻한 보색 조화 */
-    --background: 120 20% 98%;  /* 매우 연한 그린 화이트 */
-    --foreground: 150 15% 20%;  /* 진한 그린 그레이 */
+    /* 라이트 테마 - 세련된 Green Jade & Soft Neutral */
+    --background: 150 20% 98.5%;    /* 매우 맑고 깨끗한 그린빛 화이트 */
+    --foreground: 160 25% 12%;      /* 깊은 차콜 그린 (가독성 최적화) */
 
-    --card: 0 0% 100%;
-    --card-foreground: 150 15% 20%;
+    --card: 0 0% 100%;              /* 순백색 카드 배경 */
+    --card-foreground: 160 25% 12%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 150 15% 20%;
+    --popover-foreground: 160 25% 12%;
 
-    --primary: 150 30% 45%;     /* 그린 제이드 (Green Jade) */
-    --primary-foreground: 0 0% 100%;
+    --primary: 158 45% 42%;         /* 세련된 제이드 그린 (더 깊고 안정적인 톤) */
+    --primary-foreground: 150 20% 98%;
 
-    --secondary: 120 15% 94%;   /* 연한 그린 그레이 */
-    --secondary-foreground: 150 15% 25%;
+    --secondary: 150 15% 94%;       /* 은은한 그린 그레이 */
+    --secondary-foreground: 160 20% 25%;
 
-    --muted: 120 20% 96%;       /* 매우 연한 그린 배경 */
-    --muted-foreground: 150 8% 50%;   /* 중간 그레이 (높은 대비) */
+    --muted: 150 12% 95%;           /* 차분한 뮤트 톤 */
+    --muted-foreground: 160 10% 45%;
 
-    --accent: 25 70% 55%;       /* 따뜻한 테라코타 (보색) */
+    --accent: 22 75% 58%;           /* 차분하면서도 생기 있는 테라코타 */
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 70% 55%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 120 15% 85%;      /* 연한 그린 그레이 보더 */
-    --input: 0 0% 100%;         /* 흰색 입력 필드 */
-    --ring: 150 30% 45%;        /* Primary와 동일 */
+    --border: 155 15% 89%;          /* 부드러운 경계선 */
+    --input: 155 15% 89%;
+    --ring: 158 45% 42%;
 
-    --chart-1: 150 30% 45%;     /* Green Jade */
-    --chart-2: 25 70% 55%;      /* Terracotta */
-    --chart-3: 220 50% 55%;     /* Soft Blue */
-    --chart-4: 45 60% 50%;      /* Warm Gold */
-    --chart-5: 340 60% 50%;     /* Soft Red */
     --radius: 0.75rem;
   }
 
   .dark {
-    /* 다크 테마 - 그린 제이드 + 부드러운 대비 */
-    --background: 150 20% 8%;    /* 진한 그린 배경 */
-    --foreground: 120 10% 88%;   /* 밝은 그린 그레이 */
+    /* 다크 테마 - 깊은 딥 그린 & 에메랄드 */
+    --background: 165 25% 6%;       /* 아주 깊은 어둠 속의 그린 */
+    --foreground: 150 15% 92%;
 
-    --card: 150 20% 10%;
-    --card-foreground: 120 10% 88%;
+    --card: 165 25% 8%;
+    --card-foreground: 150 15% 92%;
 
-    --popover: 150 20% 10%;
-    --popover-foreground: 120 10% 88%;
+    --popover: 165 25% 8%;
+    --popover-foreground: 150 15% 92%;
 
-    --primary: 150 35% 60%;      /* 밝은 그린 제이드 */
-    --primary-foreground: 150 20% 8%;
+    --primary: 158 50% 55%;         /* 어두운 배경에서 빛나는 제이드 그린 */
+    --primary-foreground: 165 25% 6%;
 
-    --secondary: 150 15% 18%;    /* 진한 그린 그레이 */
-    --secondary-foreground: 120 10% 88%;
+    --secondary: 165 15% 15%;
+    --secondary-foreground: 150 15% 92%;
 
-    --muted: 150 20% 12%;        /* 진한 그린 배경 */
-    --muted-foreground: 150 8% 65%;   /* 밝은 그레이 (높은 대비) */
+    --muted: 165 15% 12%;
+    --muted-foreground: 160 10% 65%;
 
-    --accent: 25 60% 65%;        /* 부드러운 테라코타 */
-    --accent-foreground: 150 20% 8%;
+    --accent: 22 70% 62%;
+    --accent-foreground: 165 25% 6%;
 
-    --destructive: 0 60% 45%;
-    --destructive-foreground: 120 10% 88%;
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 150 15% 92%;
 
-    --border: 150 15% 20%;       /* 진한 그린 보더 */
-    --input: 150 20% 12%;        /* 진한 그린 입력 필드 */
-    --ring: 150 35% 60%;
-
-    --chart-1: 150 35% 60%;      /* Bright Green Jade */
-    --chart-2: 25 60% 65%;       /* Soft Terracotta */
-    --chart-3: 220 45% 65%;      /* Soft Blue */
-    --chart-4: 45 55% 60%;       /* Warm Gold */
-    --chart-5: 340 55% 60%;      /* Soft Red */
+    --border: 165 15% 16%;
+    --input: 165 15% 16%;
+    --ring: 158 50% 55%;
   }
 }
 
@@ -84,50 +73,37 @@
     border-color: hsl(var(--border));
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased selection:bg-primary/20;
   }
 }
 
 @layer components {
-  /* 입력 필드 개선 - 높은 대비 보장 */
+  /* 입력 필드 고도화 */
   .input-enhanced {
-    @apply bg-input text-foreground placeholder:text-muted-foreground;
-    @apply border-border focus:border-primary focus:ring-primary/20;
+    @apply bg-background text-foreground transition-all duration-200;
+    @apply border border-border focus:border-primary focus:ring-4 focus:ring-primary/10;
   }
 
-  /* 카드 컴포넌트 개선 */
+  /* 카드 고도화 */
   .card-enhanced {
-    @apply bg-card text-card-foreground border-border/50;
-    @apply shadow-sm hover:shadow-md transition-shadow;
+    @apply bg-card text-card-foreground border border-border/60 transition-all duration-300;
+    @apply shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_10px_20px_-2px_rgba(0,0,0,0.04)];
+    @apply hover:shadow-[0_10px_40px_-10px_rgba(0,0,0,0.1),0_20px_25px_-5px_rgba(0,0,0,0.05)];
   }
 
-  /* 버튼 대비 개선 */
+  /* 버튼 스타일 고도화 */
   .btn-primary-enhanced {
-    @apply bg-primary text-primary-foreground hover:bg-primary/90;
-    @apply shadow-md hover:shadow-lg transition-all;
+    @apply bg-primary text-primary-foreground transition-all duration-300;
+    @apply shadow-[0_4px_14px_0_rgba(16,185,129,0.39)] hover:shadow-[0_6px_20px_rgba(16,185,129,0.23)];
+    @apply hover:bg-primary/95 active:scale-[0.98];
   }
 
-  .btn-secondary-enhanced {
-    @apply bg-secondary text-secondary-foreground hover:bg-secondary/80;
-    @apply border border-border;
+  /* 타이포그래피 스타일 */
+  .heading-hero {
+    @apply font-extrabold tracking-tight text-foreground;
   }
 
-  /* 네비게이션 개선 */
-  .nav-enhanced {
-    @apply bg-background/95 backdrop-blur-md border-b border-border/50;
-  }
-
-  /* 텍스트 대비 개선 */
-  .text-high-contrast {
-    @apply text-foreground;
-  }
-
-  .text-medium-contrast {
-    @apply text-muted-foreground;
-  }
-
-  /* Focus 상태 개선 */
-  .focus-enhanced {
-    @apply focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary;
+  .text-subtle {
+    @apply text-muted-foreground leading-relaxed;
   }
 }

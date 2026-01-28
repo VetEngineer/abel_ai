@@ -55,16 +55,25 @@ export class VisualDesignAgent extends BaseAgent {
     )
   }
 
-  async execute(input: VisualDesignInput, context: SharedContext): Promise<AgentResult> {
+  async execute(input: any, context: SharedContext): Promise<AgentResult> {
     const startTime = Date.now()
     this.setStatus('processing' as any)
 
     try {
-      const thumbnailDesign = this.designThumbnail(input)
-      const imageRecommendations = this.recommendImages(input)
-      const brandingGuidelines = this.createBrandingGuidelines(input)
-      const visualHierarchy = this.establishVisualHierarchy(input)
-      const accessibilityFeatures = this.ensureAccessibility(input)
+      // 입력 데이터 정규화 처리
+      const normalizedInput = {
+        contentData: input?.content ? input : input?.contentData || { content: { mainSections: [] } },
+        specialization: input?.specialization || context?.platform || 'other',
+        brandVoice: input?.brandVoice || context?.brandTone || '전문적인',
+        targetAudience: input?.targetAudience || context?.targetAudience || '일반 사용자',
+        topic: input?.topic || '전문 서비스'
+      }
+
+      const thumbnailDesign = this.designThumbnail(normalizedInput)
+      const imageRecommendations = this.recommendImages(normalizedInput)
+      const brandingGuidelines = this.createBrandingGuidelines(normalizedInput)
+      const visualHierarchy = this.establishVisualHierarchy(normalizedInput)
+      const accessibilityFeatures = this.ensureAccessibility(normalizedInput)
 
       const output: VisualDesignOutput = {
         thumbnailDesign,
@@ -84,7 +93,7 @@ export class VisualDesignAgent extends BaseAgent {
     }
   }
 
-  private designThumbnail(input: VisualDesignInput) {
+  private designThumbnail(input: any) {
     const { specialization, topic, brandVoice } = input
 
     const concept = this.getThumbnailConcept(specialization, topic)
@@ -237,8 +246,8 @@ export class VisualDesignAgent extends BaseAgent {
     ]
   }
 
-  private recommendImages(input: VisualDesignInput) {
-    const { contentData, specialization } = input
+  private recommendImages(input: any) {
+    const { contentData, specialization, topic } = input
 
     const recommendations: Array<{
       section: string
@@ -252,18 +261,20 @@ export class VisualDesignAgent extends BaseAgent {
     recommendations.push({
       section: 'thumbnail',
       imageType: 'hero_image',
-      description: this.getHeroImageDescription(specialization, input.topic),
-      alt_text: `${input.topic} 전문가 가이드 썸네일`,
+      description: this.getHeroImageDescription(specialization, topic),
+      alt_text: `${topic} 전문가 가이드 썸네일`,
       placement: 'top_center'
     })
 
     // 각 섹션별 이미지 추천
-    contentData.content.mainSections.forEach((section, index) => {
+    const mainSections = contentData?.content?.mainSections || []
+    mainSections.forEach((section: any, index: number) => {
+      const sectionTitle = section?.title || `섹션 ${index + 1}`
       recommendations.push({
-        section: section.title,
-        imageType: this.getSectionImageType(section.title, specialization),
-        description: this.getSectionImageDescription(section.title, specialization),
-        alt_text: `${section.title} 관련 이미지`,
+        section: sectionTitle,
+        imageType: this.getSectionImageType(sectionTitle, specialization),
+        description: this.getSectionImageDescription(sectionTitle, specialization),
+        alt_text: `${sectionTitle} 관련 이미지`,
         placement: index % 2 === 0 ? 'left_align' : 'right_align'
       })
     })
@@ -302,7 +313,7 @@ export class VisualDesignAgent extends BaseAgent {
     return `${sectionTitle}의 내용을 시각적으로 설명하는 ${specialization} 전문 분야에 적합한 이미지`
   }
 
-  private createBrandingGuidelines(input: VisualDesignInput) {
+  private createBrandingGuidelines(input: any) {
     const { specialization, brandVoice } = input
 
     const primaryColors = this.getColorScheme(specialization, brandVoice).slice(0, 2)
@@ -356,7 +367,7 @@ export class VisualDesignAgent extends BaseAgent {
     return elements[specialization] || elements['other']
   }
 
-  private establishVisualHierarchy(input: VisualDesignInput) {
+  private establishVisualHierarchy(input: any) {
     const { specialization, brandVoice } = input
 
     const headingStyles: Record<string, string> = {
@@ -389,7 +400,7 @@ export class VisualDesignAgent extends BaseAgent {
     }
   }
 
-  private ensureAccessibility(input: VisualDesignInput) {
+  private ensureAccessibility(input: any) {
     const colorContrast = 'WCAG 2.1 AA 기준 준수 - 최소 4.5:1 대비율 보장'
 
     const imageDescriptions = [

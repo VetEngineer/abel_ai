@@ -62,15 +62,23 @@ export class AnswerOptimizationAgent extends BaseAgent {
     )
   }
 
-  async execute(input: AnswerOptimizationInput, context: SharedContext): Promise<AgentResult> {
+  async execute(input: any, context: SharedContext): Promise<AgentResult> {
     const startTime = Date.now()
     this.setStatus('processing' as any)
 
     try {
-      const faqSections = this.generateFAQSections(input)
-      const featuredSnippets = this.optimizeForFeaturedSnippets(input)
-      const voiceSearchOptimization = this.optimizeForVoiceSearch(input)
-      const knowledgeGraph = this.prepareKnowledgeGraph(input)
+      // 입력 데이터 정규화 처리
+      const normalizedInput = {
+        contentData: input?.content ? input : input?.contentData || {},
+        specialization: input?.specialization || context?.platform || 'other',
+        targetAudience: input?.targetAudience || context?.targetAudience || '일반 사용자',
+        topic: input?.topic || '전문 서비스'
+      }
+
+      const faqSections = this.generateFAQSections(normalizedInput)
+      const featuredSnippets = this.optimizeForFeaturedSnippets(normalizedInput)
+      const voiceSearchOptimization = this.optimizeForVoiceSearch(normalizedInput)
+      const knowledgeGraph = this.prepareKnowledgeGraph(normalizedInput)
 
       const output: AnswerOptimizationOutput = {
         faqSections,
@@ -358,16 +366,22 @@ ${professionalTone} 이 질문은 ${targetAudience}께서 자주 궁금해하시
     return tones[specialization] || tones['other']
   }
 
-  private optimizeForFeaturedSnippets(input: AnswerOptimizationInput) {
+  private optimizeForFeaturedSnippets(input: any) {
     const { topic, specialization, contentData } = input
 
     // How-to 구조 최적화
+    const mainSections = contentData?.content?.mainSections || [
+      { title: '기본 개념 이해', keyPoints: ['핵심 개념 파악'] },
+      { title: '실무 적용 방법', keyPoints: ['단계별 진행'] },
+      { title: '주의사항 확인', keyPoints: ['위험 요소 검토'] }
+    ]
+
     const howToStructure = {
       title: `${topic} 단계별 가이드`,
-      steps: contentData.content.mainSections.slice(0, 5).map((section, index) => ({
+      steps: mainSections.slice(0, 5).map((section: any, index: number) => ({
         stepNumber: index + 1,
         instruction: section.title,
-        details: section.keyPoints.join('. ') + '.'
+        details: (section.keyPoints || ['상세 내용']).join('. ') + '.'
       }))
     }
 
@@ -421,14 +435,20 @@ ${professionalTone} 이 질문은 ${targetAudience}께서 자주 궁금해하시
     return terms[specialization] || terms['other']
   }
 
-  private optimizeLists(contentData: ContentWritingOutput, specialization: string) {
+  private optimizeLists(contentData: any, specialization: string) {
     const lists: Array<{title: string, items: string[], type: 'numbered' | 'bulleted'}> = []
+
+    const mainSections = contentData?.content?.mainSections || [
+      { title: '기본 개념', keyPoints: ['핵심 내용'] },
+      { title: '실무 적용', keyPoints: ['적용 방법'] },
+      { title: '주의사항', keyPoints: ['위험 요소'] }
+    ]
 
     // 주요 포인트 리스트
     lists.push({
       title: '핵심 포인트',
-      items: contentData.content.mainSections.map(section =>
-        section.keyPoints[0] || section.title
+      items: mainSections.map((section: any) =>
+        (section.keyPoints && section.keyPoints[0]) || section.title
       ),
       type: 'bulleted'
     })
@@ -436,7 +456,7 @@ ${professionalTone} 이 질문은 ${targetAudience}께서 자주 궁금해하시
     // 단계별 리스트
     lists.push({
       title: '단계별 진행 과정',
-      items: contentData.content.mainSections.map((section, index) =>
+      items: mainSections.map((section: any, index: number) =>
         `${index + 1}단계: ${section.title}`
       ),
       type: 'numbered'

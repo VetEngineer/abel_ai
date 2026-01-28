@@ -9,12 +9,18 @@ export async function PATCH(
     const { is_active } = await request.json()
     const keyId = params.id
 
-    // 임시로 성공 응답 반환 (실제 구현에서는 DB 업데이트)
-    console.log(`API 키 ${keyId} 상태를 ${is_active ? '활성화' : '비활성화'}로 변경`)
+    const success = await apiKeyManager.toggleAPIKey(keyId, is_active)
 
-    return NextResponse.json({
-      message: `API 키가 ${is_active ? '활성화' : '비활성화'}되었습니다.`
-    })
+    if (success) {
+      return NextResponse.json({
+        message: `API 키가 ${is_active ? '활성화' : '비활성화'}되었습니다.`
+      })
+    } else {
+      return NextResponse.json(
+        { error: '해당 API 키를 찾을 수 없습니다.' },
+        { status: 404 }
+      )
+    }
   } catch (error) {
     console.error('API 키 상태 변경 오류:', error)
     return NextResponse.json(

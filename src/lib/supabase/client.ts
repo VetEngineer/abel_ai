@@ -1,5 +1,92 @@
 import { createClient } from '@supabase/supabase-js'
 
+// 데이터베이스 타입 정의
+export interface Database {
+  public: {
+    Tables: {
+      admin_accounts: {
+        Row: {
+          id: string
+          username: string
+          email: string | null
+          password_hash: string
+          role: 'super_admin' | 'admin' | 'moderator'
+          is_active: boolean
+          last_login_at: string | null
+          created_at: string
+          updated_at: string
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          username: string
+          email?: string | null
+          password_hash: string
+          role?: 'super_admin' | 'admin' | 'moderator'
+          is_active?: boolean
+          last_login_at?: string | null
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+        }
+        Update: {
+          id?: string
+          username?: string
+          email?: string | null
+          password_hash?: string
+          role?: 'super_admin' | 'admin' | 'moderator'
+          is_active?: boolean
+          last_login_at?: string | null
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+        }
+      }
+      admin_sessions: {
+        Row: {
+          id: string
+          admin_id: string
+          session_token: string
+          expires_at: string
+          ip_address: string | null
+          user_agent: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          admin_id: string
+          session_token: string
+          expires_at: string
+          ip_address?: string | null
+          user_agent?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          admin_id?: string
+          session_token?: string
+          expires_at?: string
+          ip_address?: string | null
+          user_agent?: string | null
+          created_at?: string
+        }
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      admin_role: 'super_admin' | 'admin' | 'moderator'
+    }
+  }
+}
+
+export type AdminAccount = Database['public']['Tables']['admin_accounts']['Row']
+export type AdminSession = Database['public']['Tables']['admin_sessions']['Row']
+
 // MCP 기반 Supabase 클라이언트
 let mcpSupabaseClient: any = null
 

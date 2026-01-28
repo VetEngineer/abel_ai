@@ -58,25 +58,25 @@ export class AgentCoordinator {
         agentType: AgentType.LOCAL_SEO,
         input: null,
         status: AgentStatus.IDLE,
-        dependencies: [AgentType.CONTENT_WRITING]
+        dependencies: [AgentType.VISUAL_DESIGN]
       },
       {
         agentType: AgentType.ANSWER_OPTIMIZATION,
         input: null,
         status: AgentStatus.IDLE,
-        dependencies: [AgentType.CONTENT_WRITING]
+        dependencies: [AgentType.LOCAL_SEO]
       },
       {
         agentType: AgentType.MARKETING_FUNNEL,
         input: null,
         status: AgentStatus.IDLE,
-        dependencies: [AgentType.CONTENT_WRITING]
+        dependencies: [AgentType.ANSWER_OPTIMIZATION]
       },
       {
         agentType: AgentType.BRAND_SUPERVISION,
         input: null,
         status: AgentStatus.IDLE,
-        dependencies: [AgentType.CONTENT_WRITING, AgentType.VISUAL_DESIGN]
+        dependencies: [AgentType.MARKETING_FUNNEL]
       },
       {
         agentType: AgentType.BLOG_DEPLOYMENT,
@@ -88,40 +88,90 @@ export class AgentCoordinator {
   }
 
   // 전체 워크플로우 실행
-  async executeWorkflow(initialInput: any, context: SharedContext): Promise<any> {
+  async executeWorkflow(
+    initialInput: any,
+    context: SharedContext,
+    onStepUpdate?: (update: {
+      agentType: AgentType
+      status: AgentStatus
+      stepIndex: number
+      executionTime?: number
+      tokensUsed?: number
+      error?: string
+    }) => void
+  ): Promise<any> {
     try {
       let currentInput = initialInput
+      console.log('워크플로우 시작, 초기 입력:', JSON.stringify(initialInput, null, 2))
 
-      for (const step of this.workflow) {
+      for (const [index, step] of this.workflow.entries()) {
+        console.log(`에이전트 실행 시작: ${step.agentType}`)
+
         // 의존성 확인
         if (!this.areDependenciesMet(step)) {
-          throw new Error(`Dependencies not met for ${step.agentType}`)
+          const error = `Dependencies not met for ${step.agentType}`
+          console.error(error)
+          throw new Error(error)
         }
 
         const agent = this.agents.get(step.agentType)
         if (!agent) {
-          throw new Error(`Agent ${step.agentType} not found`)
+          const error = `Agent ${step.agentType} not found`
+          console.error(error)
+          throw new Error(error)
         }
 
         // 에이전트 실행
         step.status = AgentStatus.PROCESSING
         step.input = currentInput
+        onStepUpdate?.({
+          agentType: step.agentType,
+          status: step.status,
+          stepIndex: index
+        })
 
-        const result = await agent.execute(currentInput, context)
+        try {
+          const result = await agent.execute(currentInput, context)
+          console.log(`에이전트 ${step.agentType} 실행 결과:`, result.success ? '성공' : '실패')
 
-        if (!result.success) {
+          if (!result.success) {
+            step.status = AgentStatus.ERROR
+            step.error = result.error
+            const error = `Agent ${step.agentType} failed: ${result.error}`
+            console.error(error)
+            throw new Error(error)
+          }
+
+          step.status = AgentStatus.COMPLETED
+          step.output = result.data
+          currentInput = result.data
+          onStepUpdate?.({
+            agentType: step.agentType,
+            status: step.status,
+            stepIndex: index,
+            executionTime: result.executionTime,
+            tokensUsed: result.tokensUsed
+          })
+
+          // 컨텍스트 업데이트 (토큰 제한 고려)
+          this.updateContext(context, result.data, step.agentType)
+          console.log(`에이전트 ${step.agentType} 완료`)
+
+        } catch (agentError) {
           step.status = AgentStatus.ERROR
-          throw new Error(`Agent ${step.agentType} failed: ${result.error}`)
+          step.error = agentError instanceof Error ? agentError.message : String(agentError)
+          onStepUpdate?.({
+            agentType: step.agentType,
+            status: step.status,
+            stepIndex: index,
+            error: step.error
+          })
+          console.error(`에이전트 ${step.agentType} 실행 중 오류:`, agentError)
+          throw agentError
         }
-
-        step.status = AgentStatus.COMPLETED
-        step.output = result.data
-        currentInput = result.data
-
-        // 컨텍스트 업데이트 (토큰 제한 고려)
-        this.updateContext(context, result.data, step.agentType)
       }
 
+      console.log('워크플로우 완료')
       return currentInput
     } catch (error) {
       console.error('Workflow execution failed:', error)
@@ -148,9 +198,34 @@ export class AgentCoordinator {
       case AgentType.CONTENT_PLANNING:
         context.targetAudience = output.targetAudience || context.targetAudience
         context.contentGoal = output.contentGoal || context.contentGoal
+        context.platform = output.specialization || context.platform
+        break
+      case AgentType.SEO_OPTIMIZATION:
+        // SEO 에이전트는 컨텍스트에 추가 정보 제공하지 않음 (크기 제한)
+        break
+      case AgentType.COPYWRITING:
+        // 카피라이팅은 컨텍스트에 브랜드 톤 정보 제공 가능하나 크기 제한으로 생략
+        break
+      case AgentType.CONTENT_WRITING:
+        // 콘텐츠는 너무 클 수 있어 컨텍스트에 추가하지 않음
+        break
+      case AgentType.VISUAL_DESIGN:
+        // 비주얼 정보는 컨텍스트에 추가하지 않음
+        break
+      case AgentType.LOCAL_SEO:
+        // 로컬 SEO 정보는 컨텍스트에 추가하지 않음
+        break
+      case AgentType.ANSWER_OPTIMIZATION:
+        // FAQ 정보는 컨텍스트에 추가하지 않음
+        break
+      case AgentType.MARKETING_FUNNEL:
+        // 마케팅 퍼널 정보는 컨텍스트에 추가하지 않음
         break
       case AgentType.BRAND_SUPERVISION:
-        context.brandTone = output.brandTone || context.brandTone
+        context.brandTone = output.brandAlignment?.voiceConsistency?.aligned ? context.brandTone : '검토필요'
+        break
+      case AgentType.BLOG_DEPLOYMENT:
+        // 배포 정보는 컨텍스트에 추가하지 않음
         break
     }
 
@@ -168,6 +243,16 @@ export class AgentCoordinator {
       agentType: step.agentType,
       status: step.status,
       hasOutput: !!step.output
+    }))
+  }
+
+  getWorkflowSteps() {
+    return this.workflow.map(step => ({
+      agentType: step.agentType,
+      status: step.status,
+      hasOutput: !!step.output,
+      output: step.output,
+      error: step.error
     }))
   }
 }

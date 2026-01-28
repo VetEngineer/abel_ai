@@ -43,22 +43,28 @@ export class ContentPlanningAgent extends BaseAgent {
     )
   }
 
-  async execute(input: ContentPlanningInput, context: SharedContext): Promise<AgentResult> {
+  async execute(input: any, context: SharedContext): Promise<AgentResult> {
     const startTime = Date.now()
     this.setStatus('processing' as any)
 
     try {
-      const primaryKeyword = this.selectPrimaryKeyword(input.keywords.keywords)
-      const contentStrategy = this.developContentStrategy(primaryKeyword, input.targetAudience, input.brandVoice)
-      const structure = this.createContentStructure(primaryKeyword, input.keywords)
-      const seoStrategy = this.planSEOStrategy(input.keywords.keywords, primaryKeyword)
+      // 입력 데이터 정규화 처리
+      const keywords = input?.keywords?.keywords || input?.keywords || []
+      const targetAudience = input?.targetAudience || context?.targetAudience || '일반 사용자'
+      const brandVoice = input?.brandVoice || context?.brandTone || '친근한'
+      const contentGoals = input?.contentGoals || ['engagement']
+
+      const primaryKeyword = this.selectPrimaryKeyword(keywords)
+      const contentStrategy = this.developContentStrategy(primaryKeyword, targetAudience, brandVoice)
+      const structure = this.createContentStructure(primaryKeyword, { keywords })
+      const seoStrategy = this.planSEOStrategy(keywords, primaryKeyword)
 
       const output: ContentPlanningOutput = {
         contentStrategy,
         structure,
         seoStrategy,
-        targetAudience: input.targetAudience,
-        contentGoal: input.contentGoals[0] || 'engagement'
+        targetAudience,
+        contentGoal: Array.isArray(contentGoals) ? contentGoals[0] : contentGoals || 'engagement'
       }
 
       const executionTime = Date.now() - startTime
@@ -73,12 +79,16 @@ export class ContentPlanningAgent extends BaseAgent {
 
   private selectPrimaryKeyword(keywords: any[]): string {
     // 검색량과 경쟁도를 고려하여 주요 키워드 선택
+    if (!keywords || !Array.isArray(keywords) || keywords.length === 0) {
+      return '기본 키워드'
+    }
+
     const sorted = keywords.sort((a, b) => {
-      const scoreA = a.searchVolume * (a.competition === 'low' ? 1.5 : a.competition === 'medium' ? 1 : 0.7)
-      const scoreB = b.searchVolume * (b.competition === 'low' ? 1.5 : b.competition === 'medium' ? 1 : 0.7)
+      const scoreA = (a?.searchVolume || 0) * (a?.competition === 'low' ? 1.5 : a?.competition === 'medium' ? 1 : 0.7)
+      const scoreB = (b?.searchVolume || 0) * (b?.competition === 'low' ? 1.5 : b?.competition === 'medium' ? 1 : 0.7)
       return scoreB - scoreA
     })
-    return sorted[0]?.keyword || keywords[0]?.keyword
+    return sorted[0]?.keyword || keywords[0]?.keyword || '기본 키워드'
   }
 
   private developContentStrategy(primaryKeyword: string, targetAudience: string, brandVoice: string) {
@@ -113,16 +123,30 @@ export class ContentPlanningAgent extends BaseAgent {
     return `${brandVoice} 스타일로 ${keyword}에 대한 실용적이고 신뢰할 수 있는 정보 제공`
   }
 
-  private createContentStructure(primaryKeyword: string, keywordData: TrendKeywordOutput) {
-    const mainSections = keywordData.keywords.slice(1, 4).map((kw, index) => ({
-      title: `${index + 1}. ${kw.keyword}의 핵심 포인트`,
+  private createContentStructure(primaryKeyword: string, keywordData: any) {
+    const keywords = keywordData?.keywords || []
+    const mainSections = keywords.slice(1, 4).map((kw: any, index: number) => ({
+      title: `${index + 1}. ${kw?.keyword || `섹션 ${index + 1}`}의 핵심 포인트`,
       keyPoints: [
-        `${kw.keyword}의 주요 특징`,
+        `${kw?.keyword || '해당 주제'}의 주요 특징`,
         `실제 활용 방법`,
         `주의사항 및 팁`
       ],
-      targetKeyword: kw.keyword
+      targetKeyword: kw?.keyword || `키워드 ${index + 1}`
     }))
+
+    // 섹션이 없는 경우 기본 섹션 생성
+    if (mainSections.length === 0) {
+      mainSections.push({
+        title: `1. ${primaryKeyword}의 기본 개념`,
+        keyPoints: [
+          `${primaryKeyword}의 주요 특징`,
+          `실제 활용 방법`,
+          `주의사항 및 팁`
+        ],
+        targetKeyword: primaryKeyword
+      })
+    }
 
     return {
       introduction: `${primaryKeyword}에 대한 포괄적인 이해를 돕는 서론`,
@@ -132,10 +156,11 @@ export class ContentPlanningAgent extends BaseAgent {
   }
 
   private planSEOStrategy(keywords: any[], primaryKeyword: string) {
+    const safeKeywords = Array.isArray(keywords) ? keywords : []
     return {
       primaryKeyword,
-      secondaryKeywords: keywords.slice(1, 6).map(k => k.keyword),
-      targetWordCount: Math.max(1500, keywords.length * 300) // 키워드 개수에 따라 조정
+      secondaryKeywords: safeKeywords.slice(1, 6).map(k => k?.keyword || '').filter(Boolean),
+      targetWordCount: Math.max(1500, safeKeywords.length * 300) // 키워드 개수에 따라 조정
     }
   }
 }

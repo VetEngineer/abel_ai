@@ -1,9 +1,12 @@
 import crypto from 'crypto'
+import { apiKeyStorage, StoredAPIKey } from './api-key-storage'
 
 export interface APIKeyConfig {
   id: string
-  service_name: 'claude' | 'openai' | 'gemini' | 'stripe'
-  api_key: string
+  service_name: 'claude' | 'openai' | 'gemini' | 'stripe' | 'naver_search' | 'naver_datalab'
+  api_key?: string // For Claude, OpenAI, Gemini
+  client_id?: string // For Naver APIs
+  client_secret?: string // For Naver APIs
   api_key_name: string
   is_active: boolean
   rate_limit_per_minute: number
@@ -75,14 +78,23 @@ class APIKeyManager {
     }
   }
 
-  // 활성화된 API 키 조회 (캐시 활용)
-  public async getActiveAPIKey(service: 'claude' | 'openai' | 'gemini' | 'stripe'): Promise<string | null> {
-    // Supabase가 설정되지 않은 경우 환경 변수에서 직접 가져오기
+  // 활성화된 API 키 조회 (메모리 스토리지 우선, 환경변수 대체)
+  public async getActiveAPIKey(service: 'claude' | 'openai' | 'gemini' | 'stripe' | 'naver_search' | 'naver_datalab'): Promise<string | null> {
+    // 1. 메모리 스토리지에서 활성화된 키 조회
+    const storedKey = apiKeyStorage.getActiveKey(service)
+    if (storedKey && storedKey.is_active) {
+      console.log(`메모리 스토리지에서 ${service} API 키를 사용합니다.`)
+      return storedKey.api_key || null
+    }
+
+    // 2. 환경 변수에서 대체 조회 (기존 호환성)
     const envKeyMap = {
       'claude': process.env.CLAUDE_API_KEY,
       'openai': process.env.OPENAI_API_KEY,
       'gemini': process.env.GOOGLE_AI_API_KEY,
-      'stripe': process.env.STRIPE_SECRET_KEY
+      'stripe': process.env.STRIPE_SECRET_KEY,
+      'naver_search': null, // 네이버는 client_id/secret 구조
+      'naver_datalab': null
     }
 
     const envKey = envKeyMap[service]
@@ -91,8 +103,32 @@ class APIKeyManager {
       return envKey
     }
 
-    // 기본값 반환 (Supabase 설정 시 실제 구현 활성화)
     console.warn(`${service} API 키를 찾을 수 없습니다.`)
+    return null
+  }
+
+  // 네이버 API용 클라이언트 정보 조회
+  public async getNaverAPICredentials(): Promise<{ clientId: string; clientSecret: string } | null> {
+    // 메모리 스토리지에서 네이버 검색 API 키 조회
+    const storedKey = apiKeyStorage.getActiveKey('naver_search')
+    if (storedKey && storedKey.is_active && storedKey.client_id && storedKey.client_secret) {
+      console.log('메모리 스토리지에서 네이버 API 인증정보를 사용합니다.')
+      return {
+        clientId: storedKey.client_id,
+        clientSecret: storedKey.client_secret
+      }
+    }
+
+    // 환경 변수에서 대체 조회
+    if (process.env.NAVER_CLIENT_ID && process.env.NAVER_CLIENT_SECRET) {
+      console.log('환경 변수에서 네이버 API 인증정보를 사용합니다.')
+      return {
+        clientId: process.env.NAVER_CLIENT_ID,
+        clientSecret: process.env.NAVER_CLIENT_SECRET
+      }
+    }
+
+    console.warn('네이버 API 인증정보를 찾을 수 없습니다.')
     return null
   }
 
@@ -152,15 +188,123 @@ class APIKeyManager {
 
   // 전체 API 키 목록 조회 (관리자용)
   public async getAllAPIKeys(): Promise<APIKeyConfig[]> {
-    // 환경 변수가 제대로 설정되지 않은 경우 데모 데이터 반환
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    if (!supabaseUrl || supabaseUrl === 'your_supabase_project_url' || !supabaseUrl.startsWith('http')) {
-      console.warn('Supabase not configured, returning demo API keys')
+    try {
+      // 메모리 스토리지에서 모든 키 조회
+      const storedKeys = apiKeyStorage.getAllKeys()
+
+      // StoredAPIKey를 APIKeyConfig 형식으로 변환
+      const apiKeys: APIKeyConfig[] = storedKeys.map(key => ({
+        id: key.id,
+        service_name: key.service_name,
+        api_key: key.api_key,
+        client_id: key.client_id,
+        client_secret: key.client_secret,
+        api_key_name: key.api_key_name,
+        is_active: key.is_active,
+        rate_limit_per_minute: key.rate_limit_per_minute,
+        monthly_budget_usd: key.monthly_budget_usd,
+        current_month_cost: key.current_month_cost,
+        usage_count: key.usage_count,
+        last_used: key.last_used
+      }))
+
+      console.log(`메모리 스토리지에서 ${apiKeys.length}개 API 키 조회`)
+      return apiKeys
+    } catch (error) {
+      console.error('API 키 조회 실패:', error)
       return this.getDemoAPIKeys()
     }
+  }
 
-    // 데모 데이터 반환
-    return this.getDemoAPIKeys()
+  // API 키 추가/수정 (관리자용)
+  public async upsertAPIKey(apiKeyData: Omit<APIKeyConfig, 'id'> & { id?: string }): Promise<APIKeyConfig> {
+    try {
+      // APIKeyConfig를 StoredAPIKey 형식으로 변환
+      const storedKeyData: Omit<StoredAPIKey, 'id' | 'created_at' | 'current_month_cost' | 'usage_count'> & { id?: string } = {
+        id: apiKeyData.id,
+        service_name: apiKeyData.service_name,
+        api_key: apiKeyData.api_key,
+        client_id: apiKeyData.client_id,
+        client_secret: apiKeyData.client_secret,
+        api_key_name: apiKeyData.api_key_name,
+        is_active: apiKeyData.is_active,
+        rate_limit_per_minute: apiKeyData.rate_limit_per_minute,
+        monthly_budget_usd: apiKeyData.monthly_budget_usd,
+        last_used: apiKeyData.last_used
+      }
+
+      // 메모리 스토리지에 저장
+      const savedKey = apiKeyStorage.upsertKey(storedKeyData)
+
+      // StoredAPIKey를 APIKeyConfig로 변환하여 반환
+      const result: APIKeyConfig = {
+        id: savedKey.id,
+        service_name: savedKey.service_name,
+        api_key: savedKey.api_key,
+        client_id: savedKey.client_id,
+        client_secret: savedKey.client_secret,
+        api_key_name: savedKey.api_key_name,
+        is_active: savedKey.is_active,
+        rate_limit_per_minute: savedKey.rate_limit_per_minute,
+        monthly_budget_usd: savedKey.monthly_budget_usd,
+        current_month_cost: savedKey.current_month_cost,
+        usage_count: savedKey.usage_count,
+        last_used: savedKey.last_used
+      }
+
+      console.log(`API 키 저장 완료: ${result.service_name} - ${result.api_key_name}`)
+      return result
+    } catch (error) {
+      console.error('API 키 저장 실패:', error)
+      throw error
+    }
+  }
+
+  // API 키 삭제 (관리자용)
+  public async deleteAPIKey(keyId: string): Promise<boolean> {
+    try {
+      // 메모리 스토리지에서 삭제
+      const deleted = apiKeyStorage.deleteKey(keyId)
+
+      if (deleted) {
+        console.log(`API 키 삭제 완료: ${keyId}`)
+        return true
+      } else {
+        console.warn(`삭제할 API 키를 찾을 수 없습니다: ${keyId}`)
+        return false
+      }
+    } catch (error) {
+      console.error(`API 키 삭제 실패: ${keyId}`, error)
+      return false
+    }
+  }
+
+  // API 키 활성화/비활성화 (관리자용)
+  public async toggleAPIKey(keyId: string, isActive: boolean): Promise<boolean> {
+    try {
+      const toggled = apiKeyStorage.toggleKey(keyId, isActive)
+
+      if (toggled) {
+        console.log(`API 키 상태 변경 완료: ${keyId} -> ${isActive ? '활성' : '비활성'}`)
+        return true
+      } else {
+        console.warn(`상태를 변경할 API 키를 찾을 수 없습니다: ${keyId}`)
+        return false
+      }
+    } catch (error) {
+      console.error(`API 키 상태 변경 실패: ${keyId}`, error)
+      return false
+    }
+  }
+
+  // 사용량 업데이트 (관리자용)
+  public async updateKeyUsage(keyId: string, cost: number): Promise<void> {
+    try {
+      apiKeyStorage.updateUsage(keyId, cost)
+      console.log(`API 키 사용량 업데이트 완료: ${keyId} (+$${cost.toFixed(4)})`)
+    } catch (error) {
+      console.error(`API 키 사용량 업데이트 실패: ${keyId}`, error)
+    }
   }
 
   private getDemoAPIKeys(): APIKeyConfig[] {
@@ -200,6 +344,32 @@ class APIKeyManager {
         current_month_cost: 0,
         usage_count: 0,
         last_used: undefined
+      },
+      {
+        id: 'demo-4',
+        service_name: 'naver_search',
+        client_id: 'YOUR_NAVER_CLIENT_ID',
+        client_secret: 'YOUR_NAVER_CLIENT_SECRET',
+        api_key_name: 'Naver Search API',
+        is_active: true,
+        rate_limit_per_minute: 1000,
+        monthly_budget_usd: 100,
+        current_month_cost: 12.34,
+        usage_count: 567,
+        last_used: '2024-12-26T10:00:00Z'
+      },
+      {
+        id: 'demo-5',
+        service_name: 'naver_datalab',
+        client_id: 'YOUR_NAVER_CLIENT_ID',
+        client_secret: 'YOUR_NAVER_CLIENT_SECRET',
+        api_key_name: 'Naver DataLab API',
+        is_active: true,
+        rate_limit_per_minute: 100,
+        monthly_budget_usd: 50,
+        current_month_cost: 5.67,
+        usage_count: 89,
+        last_used: '2024-12-26T09:45:00Z'
       }
     ]
   }

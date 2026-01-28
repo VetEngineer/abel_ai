@@ -90,19 +90,33 @@ export class BrandSupervisionAgent extends BaseAgent {
     )
   }
 
-  async execute(input: BrandSupervisionInput, context: SharedContext): Promise<AgentResult> {
+  async execute(input: any, context: SharedContext): Promise<AgentResult> {
     const startTime = Date.now()
     this.setStatus('processing' as any)
 
     try {
-      const qualityAssessment = this.assessOverallQuality(input)
-      const contentValidation = this.validateContent(input)
-      const brandAlignment = this.checkBrandAlignment(input)
+      // 입력 데이터 정규화 처리
+      const normalizedInput = {
+        contentData: input?.content ? input : input?.contentData || {},
+        copyData: input?.headlines ? input : input?.copyData || {},
+        seoData: input?.metaData ? input : input?.seoData || {},
+        visualData: input?.colorScheme ? input : input?.visualData || {},
+        funnelData: input?.funnelStages ? input : input?.funnelData || {},
+        specialization: input?.specialization || context?.platform || 'other',
+        brandVoice: input?.brandVoice || context?.brandTone || '전문적인',
+        targetAudience: input?.targetAudience || context?.targetAudience || '일반 사용자',
+        topic: input?.topic || '전문 서비스',
+        contentGoals: input?.contentGoals || context?.contentGoal || 'engagement'
+      }
+
+      const qualityAssessment = this.assessOverallQuality(normalizedInput)
+      const contentValidation = this.validateContent(normalizedInput)
+      const brandAlignment = this.checkBrandAlignment(normalizedInput)
       const finalRecommendations = this.generateFinalRecommendations(
         qualityAssessment,
         contentValidation,
         brandAlignment,
-        input
+        normalizedInput
       )
 
       const output: BrandSupervisionOutput = {
@@ -122,7 +136,7 @@ export class BrandSupervisionAgent extends BaseAgent {
     }
   }
 
-  private assessOverallQuality(input: BrandSupervisionInput) {
+  private assessOverallQuality(input: any) {
     const contentQuality = this.assessContentQuality(input)
     const brandConsistency = this.assessBrandConsistency(input)
     const professionalStandards = this.assessProfessionalStandards(input)
@@ -139,7 +153,7 @@ export class BrandSupervisionAgent extends BaseAgent {
     }
   }
 
-  private assessContentQuality(input: BrandSupervisionInput) {
+  private assessContentQuality(input: any) {
     const { contentData, specialization, targetAudience } = input
     let score = 85 // 기본 점수
 
@@ -191,7 +205,7 @@ export class BrandSupervisionAgent extends BaseAgent {
     }
   }
 
-  private assessBrandConsistency(input: BrandSupervisionInput) {
+  private assessBrandConsistency(input: any) {
     const { brandVoice, specialization } = input
     let score = 90
 
@@ -231,7 +245,7 @@ export class BrandSupervisionAgent extends BaseAgent {
     }
   }
 
-  private assessProfessionalStandards(input: BrandSupervisionInput) {
+  private assessProfessionalStandards(input: any) {
     const { specialization } = input
     let score = 95
 
@@ -299,23 +313,23 @@ export class BrandSupervisionAgent extends BaseAgent {
     return true
   }
 
-  private checkVoiceConsistency(input: BrandSupervisionInput): boolean {
+  private checkVoiceConsistency(input: any): boolean {
     // 브랜드 보이스 일관성 체크
     // 실제 구현에서는 각 에이전트 결과물의 톤 분석 필요
     return true
   }
 
-  private checkSpecializationConsistency(input: BrandSupervisionInput): boolean {
+  private checkSpecializationConsistency(input: any): boolean {
     // 전문 분야 일관성 체크
     return true
   }
 
-  private checkVisualConsistency(input: BrandSupervisionInput): boolean {
+  private checkVisualConsistency(input: any): boolean {
     // 시각적 일관성 체크
     return true
   }
 
-  private validateContent(input: BrandSupervisionInput) {
+  private validateContent(input: any) {
     const factualAccuracy = this.checkFactualAccuracy(input)
     const legalCompliance = this.checkLegalCompliance(input)
     const ethicalStandards = this.checkEthicalStandards(input)
@@ -327,7 +341,7 @@ export class BrandSupervisionAgent extends BaseAgent {
     }
   }
 
-  private checkFactualAccuracy(input: BrandSupervisionInput) {
+  private checkFactualAccuracy(input: any) {
     const sources = this.getRecommendedSources(input.specialization)
     const disclaimers = this.getRequiredDisclaimers(input.specialization)
 
@@ -338,7 +352,7 @@ export class BrandSupervisionAgent extends BaseAgent {
     }
   }
 
-  private checkLegalCompliance(input: BrandSupervisionInput) {
+  private checkLegalCompliance(input: any) {
     const risks = this.identifyLegalRisks(input)
     const recommendations = this.getLegalRecommendations(input.specialization)
 
@@ -349,7 +363,7 @@ export class BrandSupervisionAgent extends BaseAgent {
     }
   }
 
-  private checkEthicalStandards(input: BrandSupervisionInput) {
+  private checkEthicalStandards(input: any) {
     const ethicalCheck = this.checkEthicalCompliance(input)
 
     return {
@@ -359,7 +373,7 @@ export class BrandSupervisionAgent extends BaseAgent {
     }
   }
 
-  private checkEthicalCompliance(input: BrandSupervisionInput): { compliant: boolean; issues: string[] } {
+  private checkEthicalCompliance(input: any): { compliant: boolean; issues: string[] } {
     const issues: string[] = []
 
     // 과대광고 검출
@@ -383,7 +397,7 @@ export class BrandSupervisionAgent extends BaseAgent {
     }
   }
 
-  private checkOverstatement(input: BrandSupervisionInput): boolean {
+  private checkOverstatement(input: any): boolean {
     // 과대광고 표현 검출 로직
     const problematicPhrases = [
       '100% 보장', '완전한 치료', '무조건 성공', '절대적', '최고의 결과',
@@ -394,7 +408,7 @@ export class BrandSupervisionAgent extends BaseAgent {
     return problematicPhrases.some(phrase => content.includes(phrase.toLowerCase()))
   }
 
-  private checkCredentialMention(input: BrandSupervisionInput): boolean {
+  private checkCredentialMention(input: any): boolean {
     // 전문가 자격 명시 확인
     const credentialPhrases = [
       '전문가', '자격', '경험', '상담', '면허', '인증'
@@ -404,7 +418,7 @@ export class BrandSupervisionAgent extends BaseAgent {
     return credentialPhrases.some(phrase => content.includes(phrase))
   }
 
-  private checkDisclaimer(input: BrandSupervisionInput): boolean {
+  private checkDisclaimer(input: any): boolean {
     // 면책조항 존재 확인
     const disclaimerPhrases = [
       '개별', '상황', '전문가 상담', '의사와 상의', '법률 전문가', '세무사 상담'
@@ -453,7 +467,7 @@ export class BrandSupervisionAgent extends BaseAgent {
     ]
   }
 
-  private identifyLegalRisks(input: BrandSupervisionInput): string[] {
+  private identifyLegalRisks(input: any): string[] {
     const risks: string[] = []
 
     // 과대광고 위험
@@ -474,7 +488,7 @@ export class BrandSupervisionAgent extends BaseAgent {
     return risks
   }
 
-  private checkMedicalAdvertisingViolation(input: BrandSupervisionInput): boolean {
+  private checkMedicalAdvertisingViolation(input: any): boolean {
     // 의료광고 규제 위반 체크
     const violationPhrases = [
       '완치', '최고의 치료', '즉시 치료', '부작용 없는'
@@ -483,7 +497,7 @@ export class BrandSupervisionAgent extends BaseAgent {
     return violationPhrases.some(phrase => content.includes(phrase.toLowerCase()))
   }
 
-  private checkLegalAdvertisingViolation(input: BrandSupervisionInput): boolean {
+  private checkLegalAdvertisingViolation(input: any): boolean {
     // 법률서비스 광고 규제 위반 체크
     const violationPhrases = [
       '무조건 승소', '100% 성공', '확실한 승리'
@@ -542,7 +556,7 @@ export class BrandSupervisionAgent extends BaseAgent {
     ]
   }
 
-  private checkBrandAlignment(input: BrandSupervisionInput) {
+  private checkBrandAlignment(input: any) {
     const voiceConsistency = this.analyzeVoiceConsistency(input)
     const messagingCoherence = this.analyzeMessagingCoherence(input)
     const audienceAppropriatenesss = this.analyzeAudienceAppropriateness(input)
@@ -554,7 +568,7 @@ export class BrandSupervisionAgent extends BaseAgent {
     }
   }
 
-  private analyzeVoiceConsistency(input: BrandSupervisionInput) {
+  private analyzeVoiceConsistency(input: any) {
     const deviations: string[] = []
     const corrections: string[] = []
 
@@ -571,7 +585,7 @@ export class BrandSupervisionAgent extends BaseAgent {
     }
   }
 
-  private analyzeMessagingCoherence(input: BrandSupervisionInput) {
+  private analyzeMessagingCoherence(input: any) {
     const inconsistencies: string[] = []
     const unifications: string[] = []
 
@@ -585,7 +599,7 @@ export class BrandSupervisionAgent extends BaseAgent {
     }
   }
 
-  private analyzeAudienceAppropriateness(input: BrandSupervisionInput) {
+  private analyzeAudienceAppropriateness(input: any) {
     const misalignments: string[] = []
     const adjustments: string[] = []
 
@@ -606,7 +620,7 @@ export class BrandSupervisionAgent extends BaseAgent {
     qualityAssessment: any,
     contentValidation: any,
     brandAlignment: any,
-    input: BrandSupervisionInput
+    input: any
   ) {
     const criticalIssues: string[] = []
     const improvementActions: Array<{

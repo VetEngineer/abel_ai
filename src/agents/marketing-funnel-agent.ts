@@ -74,15 +74,29 @@ export class MarketingFunnelAgent extends BaseAgent {
     )
   }
 
-  async execute(input: MarketingFunnelInput, context: SharedContext): Promise<AgentResult> {
+  async execute(input: any, context: SharedContext): Promise<AgentResult> {
     const startTime = Date.now()
     this.setStatus('processing' as any)
 
     try {
-      const funnelStages = this.designFunnelStages(input)
-      const customerJourney = this.mapCustomerJourney(input)
-      const leadNurturing = this.createLeadNurturingStrategy(input)
-      const conversionOptimization = this.optimizeConversions(input)
+      // 입력 데이터 정규화 처리
+      const normalizedInput = {
+        contentData: input?.content ? input : input?.contentData || {},
+        copyData: input?.headlines ? input : input?.copyData || {
+          callToActions: {
+            primary: '전문가 상담받기',
+            secondary: ['무료 가이드 다운로드']
+          }
+        },
+        specialization: input?.specialization || context?.platform || 'other',
+        targetAudience: input?.targetAudience || context?.targetAudience || '일반 사용자',
+        contentGoals: input?.contentGoals || context?.contentGoal || 'engagement'
+      }
+
+      const funnelStages = this.designFunnelStages(normalizedInput)
+      const customerJourney = this.mapCustomerJourney(normalizedInput)
+      const leadNurturing = this.createLeadNurturingStrategy(normalizedInput)
+      const conversionOptimization = this.optimizeConversions(normalizedInput)
 
       const output: MarketingFunnelOutput = {
         funnelStages,
@@ -101,7 +115,7 @@ export class MarketingFunnelAgent extends BaseAgent {
     }
   }
 
-  private designFunnelStages(input: MarketingFunnelInput) {
+  private designFunnelStages(input: any) {
     const { specialization, targetAudience, contentGoals, copyData } = input
 
     const awareness = {
@@ -112,7 +126,7 @@ export class MarketingFunnelAgent extends BaseAgent {
 
     const interest = {
       content: this.createInterestContent(specialization, targetAudience),
-      cta: copyData.callToActions.secondary[0] || '무료 가이드 다운로드',
+      cta: copyData?.callToActions?.secondary?.[0] || '무료 가이드 다운로드',
       leadMagnets: this.createLeadMagnets(specialization)
     }
 
@@ -124,7 +138,7 @@ export class MarketingFunnelAgent extends BaseAgent {
 
     const conversion = {
       content: this.createConversionContent(specialization, targetAudience),
-      cta: copyData.callToActions.primary,
+      cta: copyData?.callToActions?.primary || '전문가 상담받기',
       conversionOptimizers: this.createConversionOptimizers(specialization)
     }
 
@@ -319,7 +333,7 @@ ${specialization} 분야의 변화하는 법규와 트렌드를 지속적으로 
     return programs[specialization] || programs['other']
   }
 
-  private mapCustomerJourney(input: MarketingFunnelInput) {
+  private mapCustomerJourney(input: any) {
     const { specialization, targetAudience } = input
 
     return [
@@ -361,7 +375,7 @@ ${specialization} 분야의 변화하는 법규와 트렌드를 지속적으로 
     ]
   }
 
-  private createLeadNurturingStrategy(input: MarketingFunnelInput) {
+  private createLeadNurturingStrategy(input: any) {
     const { specialization, targetAudience } = input
 
     const emailSequence = this.createEmailSequence(specialization, targetAudience)
@@ -452,7 +466,7 @@ ${specialization} 분야의 변화하는 법규와 트렌드를 지속적으로 
     ]
   }
 
-  private optimizeConversions(input: MarketingFunnelInput) {
+  private optimizeConversions(input: any) {
     const { specialization } = input
 
     const landingPageElements = [

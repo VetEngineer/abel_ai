@@ -60,4 +60,5 @@ export interface WorkflowStep {
   output?: any
   status: AgentStatus
   dependencies: AgentType[]
+  error?: string
 }

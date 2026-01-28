@@ -51,16 +51,25 @@ export class LocalSEOAgent extends BaseAgent {
     )
   }
 
-  async execute(input: LocalSEOInput, context: SharedContext): Promise<AgentResult> {
+  async execute(input: any, context: SharedContext): Promise<AgentResult> {
     const startTime = Date.now()
     this.setStatus('processing' as any)
 
     try {
-      const localKeywords = this.generateLocalKeywords(input)
-      const googleMyBusiness = this.optimizeGoogleMyBusiness(input)
-      const localDirectories = this.recommendLocalDirectories(input)
-      const localContent = this.planLocalContent(input)
-      const citationBuilding = this.buildCitationStrategy(input)
+      // 입력 데이터 정규화 처리
+      const normalizedInput = {
+        contentData: input?.content ? input : input?.contentData || {},
+        specialization: input?.specialization || context?.platform || 'other',
+        targetAudience: input?.targetAudience || context?.targetAudience || '일반 사용자',
+        businessLocation: input?.businessLocation || '서울',
+        serviceArea: input?.serviceArea || []
+      }
+
+      const localKeywords = this.generateLocalKeywords(normalizedInput)
+      const googleMyBusiness = this.optimizeGoogleMyBusiness(normalizedInput)
+      const localDirectories = this.recommendLocalDirectories(normalizedInput)
+      const localContent = this.planLocalContent(normalizedInput)
+      const citationBuilding = this.buildCitationStrategy(normalizedInput)
 
       const output: LocalSEOOutput = {
         localKeywords,
@@ -80,7 +89,7 @@ export class LocalSEOAgent extends BaseAgent {
     }
   }
 
-  private generateLocalKeywords(input: LocalSEOInput) {
+  private generateLocalKeywords(input: any) {
     const { specialization, businessLocation, serviceArea, targetAudience } = input
 
     // 도시별 키워드
@@ -224,7 +233,7 @@ export class LocalSEOAgent extends BaseAgent {
     return services[specialization] || services['other']
   }
 
-  private optimizeGoogleMyBusiness(input: LocalSEOInput) {
+  private optimizeGoogleMyBusiness(input: any) {
     const { specialization, targetAudience } = input
 
     const optimizationTips = [
@@ -281,7 +290,7 @@ export class LocalSEOAgent extends BaseAgent {
     return categories[specialization] || categories['other']
   }
 
-  private recommendLocalDirectories(input: LocalSEOInput) {
+  private recommendLocalDirectories(input: any) {
     const primaryDirectories = [
       '네이버 플레이스',
       '다음 플레이스',
@@ -326,7 +335,7 @@ export class LocalSEOAgent extends BaseAgent {
     return directories[specialization] || directories['other']
   }
 
-  private planLocalContent(input: LocalSEOInput) {
+  private planLocalContent(input: any) {
     const { specialization, businessLocation, targetAudience } = input
     const location = businessLocation || '서울'
 
@@ -373,7 +382,7 @@ export class LocalSEOAgent extends BaseAgent {
     }
   }
 
-  private buildCitationStrategy(input: LocalSEOInput) {
+  private buildCitationStrategy(input: any) {
     const napConsistency = [
       '모든 플랫폼에서 동일한 비즈니스명 사용',
       '주소 표기법 통일 (도로명 주소 우선)',

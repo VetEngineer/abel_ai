@@ -1,20 +1,19 @@
-'use client'
-
-import { useState } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import RealTimeLog from '@/components/admin/RealTimeLog'
 
 export default function SystemMonitoring() {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>시스템 모니터링</CardTitle>
-        <CardDescription>
-          시스템 성능과 상태를 실시간으로 모니터링합니다.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <p className="text-muted-foreground">시스템 모니터링 기능이 곧 추가될 예정입니다.</p>
-      </CardContent>
-    </Card>
+    <div className="space-y-6">
+      <Card className="card-enhanced border-none shadow-md bg-muted/20">
+        <CardHeader>
+          <CardTitle>시스템 모니터링</CardTitle>
+          <CardDescription>
+            시스템의 실시간 로그와 상태를 모니터링합니다.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <RealTimeLog />
+        </CardContent>
+      </Card>
+    </div>
   )
 }

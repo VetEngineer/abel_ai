@@ -47,16 +47,29 @@ export class SEOOptimizationAgent extends BaseAgent {
     )
   }
 
-  async execute(input: SEOOptimizationInput, context: SharedContext): Promise<AgentResult> {
+  async execute(input: any, context: SharedContext): Promise<AgentResult> {
     const startTime = Date.now()
     this.setStatus('processing' as any)
 
     try {
-      const metaData = this.optimizeMetaData(input)
-      const structuredData = this.createStructuredData(input)
-      const headings = this.optimizeHeadings(input.contentPlan)
-      const internalLinking = this.planInternalLinking(input)
-      const technicalSEO = this.analyzeTechnicalSEO(input.contentPlan)
+      // 입력 데이터 정규화 처리
+      const contentPlan = input?.contentStrategy ? input : input?.contentPlan
+      const specialization = input?.specialization || context?.platform || 'other'
+      const targetAudience = input?.targetAudience || context?.targetAudience || '일반 사용자'
+      const contentGoals = input?.contentGoals || context?.contentGoal || 'engagement'
+
+      const normalizedInput = {
+        contentPlan,
+        specialization,
+        targetAudience,
+        contentGoals
+      }
+
+      const metaData = this.optimizeMetaData(normalizedInput)
+      const structuredData = this.createStructuredData(normalizedInput)
+      const headings = this.optimizeHeadings(contentPlan)
+      const internalLinking = this.planInternalLinking(normalizedInput)
+      const technicalSEO = this.analyzeTechnicalSEO(contentPlan)
 
       const output: SEOOptimizationOutput = {
         metaData,
@@ -76,9 +89,9 @@ export class SEOOptimizationAgent extends BaseAgent {
     }
   }
 
-  private optimizeMetaData(input: SEOOptimizationInput) {
+  private optimizeMetaData(input: any) {
     const { contentPlan, specialization, targetAudience } = input
-    const primaryKeyword = contentPlan.seoStrategy.primaryKeyword
+    const primaryKeyword = contentPlan?.seoStrategy?.primaryKeyword || contentPlan?.contentStrategy?.mainTopic || '전문 서비스'
 
     // 전문직별 타이틀 최적화
     const specializationPrefix = this.getSpecializationPrefix(specialization)
@@ -86,15 +99,17 @@ export class SEOOptimizationAgent extends BaseAgent {
 
     const description = `${targetAudience}를 위한 ${primaryKeyword} 전문 정보. ${specializationPrefix}가 직접 작성한 신뢰할 수 있는 가이드로 실무에 바로 적용 가능한 노하우를 제공합니다.`
 
+    const secondaryKeywords = contentPlan?.seoStrategy?.secondaryKeywords || []
+
     return {
       title: title.slice(0, 60), // 구글 권장 길이
       description: description.slice(0, 160), // 구글 권장 길이
       keywords: [
         primaryKeyword,
-        ...contentPlan.seoStrategy.secondaryKeywords.slice(0, 8),
+        ...secondaryKeywords.slice(0, 8),
         specialization,
         targetAudience
-      ],
+      ].filter(Boolean),
       ogTitle: title.slice(0, 60),
       ogDescription: description.slice(0, 160)
     }
@@ -114,7 +129,7 @@ export class SEOOptimizationAgent extends BaseAgent {
     return prefixes[specialization] || '전문가'
   }
 
-  private createStructuredData(input: SEOOptimizationInput) {
+  private createStructuredData(input: any) {
     const { specialization, contentPlan } = input
 
     // 전문분야별 구조화 데이터 타입 결정
@@ -126,10 +141,10 @@ export class SEOOptimizationAgent extends BaseAgent {
     }
 
     const baseProperties = {
-      headline: contentPlan.contentStrategy.mainTopic,
-      description: contentPlan.contentStrategy.uniqueValue,
-      keywords: contentPlan.seoStrategy.secondaryKeywords.join(', '),
-      wordCount: contentPlan.seoStrategy.targetWordCount,
+      headline: contentPlan?.contentStrategy?.mainTopic || '전문 콘텐츠',
+      description: contentPlan?.contentStrategy?.uniqueValue || '전문가가 작성한 신뢰할 수 있는 정보',
+      keywords: contentPlan?.seoStrategy?.secondaryKeywords?.join(', ') || '',
+      wordCount: contentPlan?.seoStrategy?.targetWordCount || 1500,
       author: {
         '@type': 'Organization',
         name: this.getSpecializationPrefix(specialization)
@@ -152,7 +167,7 @@ export class SEOOptimizationAgent extends BaseAgent {
     }
   }
 
-  private getSpecializedProperties(specialization: string, contentPlan: ContentPlanningOutput) {
+  private getSpecializedProperties(specialization: string, contentPlan: any) {
     const specialized: Record<string, any> = {}
 
     if (specialization === 'medical') {
@@ -166,25 +181,25 @@ export class SEOOptimizationAgent extends BaseAgent {
       specialized.priceRange = '상담 문의'
     } else if (specialization === 'marketing') {
       specialized.serviceType = '디지털 마케팅'
-      specialized.audience = contentPlan.targetAudience
+      specialized.audience = contentPlan?.targetAudience || '마케터'
     }
 
     return specialized
   }
 
-  private optimizeHeadings(contentPlan: ContentPlanningOutput) {
-    const h1 = contentPlan.contentStrategy.mainTopic
+  private optimizeHeadings(contentPlan: any) {
+    const h1 = contentPlan?.contentStrategy?.mainTopic || '전문 가이드'
 
-    const h2 = contentPlan.structure.mainSections.map(section => section.title)
+    const h2 = contentPlan?.structure?.mainSections?.map((section: any) => section?.title) || ['주요 내용', '핵심 포인트', '실무 적용']
 
-    const h3 = contentPlan.structure.mainSections.flatMap(section =>
-      section.keyPoints.map(point => point)
-    )
+    const h3 = contentPlan?.structure?.mainSections?.flatMap((section: any) =>
+      section?.keyPoints?.map((point: any) => point)
+    ) || ['세부 설명', '주의사항', '활용 팁']
 
-    return { h1, h2, h3 }
+    return { h1, h2: h2.filter(Boolean), h3: h3.filter(Boolean) }
   }
 
-  private planInternalLinking(input: SEOOptimizationInput) {
+  private planInternalLinking(input: any) {
     const { contentPlan, specialization } = input
 
     const suggestedAnchorTexts = [
@@ -194,11 +209,14 @@ export class SEOOptimizationAgent extends BaseAgent {
       '전문가 상담 문의'
     ]
 
-    const relatedTopics = contentPlan.structure.mainSections
-      .map(section => section.targetKeyword)
+    const sectionKeywords = contentPlan?.structure?.mainSections
+      ?.map((section: any) => section?.targetKeyword)
+      ?.filter(Boolean) || []
+
+    const relatedTopics = sectionKeywords
       .concat([
         `${specialization} 기본 정보`,
-        `${contentPlan.targetAudience} 가이드`,
+        `${contentPlan?.targetAudience || '전문가'} 가이드`,
         '자주 묻는 질문'
       ])
 
@@ -208,9 +226,9 @@ export class SEOOptimizationAgent extends BaseAgent {
     }
   }
 
-  private analyzeTechnicalSEO(contentPlan: ContentPlanningOutput) {
-    const targetWordCount = contentPlan.seoStrategy.targetWordCount
-    const keywordCount = contentPlan.seoStrategy.secondaryKeywords.length
+  private analyzeTechnicalSEO(contentPlan: any) {
+    const targetWordCount = contentPlan?.seoStrategy?.targetWordCount || 1500
+    const keywordCount = contentPlan?.seoStrategy?.secondaryKeywords?.length || 5
 
     // 키워드 밀도 계산 (권장: 1-3%)
     const keywordDensity = Math.min((keywordCount / targetWordCount) * 100, 2.5)

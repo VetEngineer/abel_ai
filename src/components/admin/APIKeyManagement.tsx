@@ -13,24 +13,37 @@ import { useToast } from '@/hooks/use-toast'
 
 interface APIKey {
   id: string
-  service_name: 'claude' | 'openai' | 'gemini' | 'stripe'
+  service_name: 'claude' | 'openai' | 'gemini' | 'stripe' | 'naver_search' | 'naver_datalab'
   api_key_name: string
+  api_key?: string // For Claude, OpenAI, Gemini
+  client_id?: string // For Naver APIs
+  client_secret?: string // For Naver APIs
   is_active: boolean
   usage_count: number
   current_month_cost: number
   monthly_budget_usd: number
   last_used?: string
-  created_at: string
+  created_at?: string
 }
 
 export default function APIKeyManagement() {
   const [apiKeys, setApiKeys] = useState<APIKey[]>([])
   const [loading, setLoading] = useState(true)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
-  const [newKey, setNewKey] = useState({
-    service_name: 'claude' as const,
+  const [newKey, setNewKey] = useState<{
+    service_name: 'claude' | 'openai' | 'gemini' | 'stripe' | 'naver_search' | 'naver_datalab'
+    api_key_name: string
+    api_key: string
+    client_id: string
+    client_secret: string
+    monthly_budget_usd: number
+    rate_limit_per_minute: number
+  }>({
+    service_name: 'claude',
     api_key_name: '',
     api_key: '',
+    client_id: '',
+    client_secret: '',
     monthly_budget_usd: 1000,
     rate_limit_per_minute: 60
   })
@@ -58,13 +71,35 @@ export default function APIKeyManagement() {
   }
 
   const handleAddAPIKey = async () => {
-    if (!newKey.api_key_name || !newKey.api_key) {
+    const isNaverAPI = newKey.service_name === 'naver_search' || newKey.service_name === 'naver_datalab'
+
+    if (!newKey.api_key_name) {
       toast({
         title: "입력 오류",
-        description: "모든 필드를 입력해주세요.",
+        description: "키 이름을 입력해주세요.",
         variant: "destructive",
       })
       return
+    }
+
+    if (isNaverAPI) {
+      if (!newKey.client_id || !newKey.client_secret) {
+        toast({
+          title: "입력 오류",
+          description: "네이버 API는 클라이언트 ID와 시크릿을 모두 입력해주세요.",
+          variant: "destructive",
+        })
+        return
+      }
+    } else {
+      if (!newKey.api_key) {
+        toast({
+          title: "입력 오류",
+          description: "API 키를 입력해주세요.",
+          variant: "destructive",
+        })
+        return
+      }
     }
 
     try {
@@ -86,6 +121,8 @@ export default function APIKeyManagement() {
           service_name: 'claude',
           api_key_name: '',
           api_key: '',
+          client_id: '',
+          client_secret: '',
           monthly_budget_usd: 1000,
           rate_limit_per_minute: 60
         })
@@ -164,7 +201,21 @@ export default function APIKeyManagement() {
       case 'openai': return 'bg-green-100 text-green-800'
       case 'gemini': return 'bg-blue-100 text-blue-800'
       case 'stripe': return 'bg-orange-100 text-orange-800'
+      case 'naver_search': return 'bg-emerald-100 text-emerald-800'
+      case 'naver_datalab': return 'bg-teal-100 text-teal-800'
       default: return 'bg-gray-100 text-gray-800'
+    }
+  }
+
+  const getServiceDisplayName = (service: string) => {
+    switch (service) {
+      case 'claude': return 'CLAUDE'
+      case 'openai': return 'OPENAI'
+      case 'gemini': return 'GEMINI'
+      case 'stripe': return 'STRIPE'
+      case 'naver_search': return 'NAVER SEARCH'
+      case 'naver_datalab': return 'NAVER DATALAB'
+      default: return service.toUpperCase()
     }
   }
 
@@ -174,36 +225,40 @@ export default function APIKeyManagement() {
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
+      <Card className="card-enhanced border-none shadow-md">
+        <CardHeader className="bg-primary/5 pb-6 border-b border-primary/10">
           <div className="flex justify-between items-center">
             <div>
-              <CardTitle>API 키 관리</CardTitle>
-              <CardDescription>
-                외부 서비스 API 키를 관리하고 사용량을 모니터링합니다.
+              <CardTitle className="text-xl text-primary flex items-center gap-2">
+                <span className="text-2xl">🔑</span> API 키 관리
+              </CardTitle>
+              <CardDescription className="mt-1 text-base">
+                외부 서비스 API 키를 안전하게 관리하고 비용과 사용량을 모니터링합니다.
               </CardDescription>
             </div>
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
               <DialogTrigger asChild>
-                <Button>새 API 키 추가</Button>
+                <Button className="btn-primary-enhanced">
+                  + 새 API 키 추가
+                </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
-                  <DialogTitle>새 API 키 추가</DialogTitle>
+              <DialogContent className="sm:max-w-[500px] border-none shadow-xl">
+                <DialogHeader className="bg-primary/5 -m-6 p-6 mb-2 border-b border-primary/10">
+                  <DialogTitle className="text-primary">새 API 키 추가</DialogTitle>
                   <DialogDescription>
-                    새로운 외부 서비스 API 키를 추가합니다.
+                    새로운 외부 서비스 API 키를 시스템에 등록합니다.
                   </DialogDescription>
                 </DialogHeader>
-                <div className="grid gap-4 py-4">
+                <div className="grid gap-5 py-4">
                   <div className="grid gap-2">
-                    <label htmlFor="service">서비스</label>
+                    <label htmlFor="service" className="font-medium text-sm">서비스 공급자</label>
                     <Select
                       value={newKey.service_name}
                       onValueChange={(value: any) =>
                         setNewKey({ ...newKey, service_name: value })
                       }
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="input-enhanced">
                         <SelectValue placeholder="서비스 선택" />
                       </SelectTrigger>
                       <SelectContent>
@@ -211,6 +266,8 @@ export default function APIKeyManagement() {
                         <SelectItem value="openai">OpenAI</SelectItem>
                         <SelectItem value="gemini">Gemini (Google)</SelectItem>
                         <SelectItem value="stripe">Stripe</SelectItem>
+                        <SelectItem value="naver_search">Naver Search API</SelectItem>
+                        <SelectItem value="naver_datalab">Naver DataLab API</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -225,18 +282,47 @@ export default function APIKeyManagement() {
                       placeholder="예: Claude Production Key"
                     />
                   </div>
-                  <div className="grid gap-2">
-                    <label htmlFor="key">API 키</label>
-                    <Textarea
-                      id="key"
-                      value={newKey.api_key}
-                      onChange={(e) =>
-                        setNewKey({ ...newKey, api_key: e.target.value })
-                      }
-                      placeholder="API 키를 입력하세요"
-                      rows={3}
-                    />
-                  </div>
+                  {/* 네이버 API인 경우 클라이언트 ID/Secret 입력 */}
+                  {(newKey.service_name === 'naver_search' || newKey.service_name === 'naver_datalab') ? (
+                    <>
+                      <div className="grid gap-2">
+                        <label htmlFor="client-id">클라이언트 ID</label>
+                        <Input
+                          id="client-id"
+                          value={newKey.client_id}
+                          onChange={(e) =>
+                            setNewKey({ ...newKey, client_id: e.target.value })
+                          }
+                          placeholder="네이버 클라이언트 ID를 입력하세요"
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <label htmlFor="client-secret">클라이언트 시크릿</label>
+                        <Input
+                          id="client-secret"
+                          type="password"
+                          value={newKey.client_secret}
+                          onChange={(e) =>
+                            setNewKey({ ...newKey, client_secret: e.target.value })
+                          }
+                          placeholder="네이버 클라이언트 시크릿을 입력하세요"
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <div className="grid gap-2">
+                      <label htmlFor="key">API 키</label>
+                      <Textarea
+                        id="key"
+                        value={newKey.api_key}
+                        onChange={(e) =>
+                          setNewKey({ ...newKey, api_key: e.target.value })
+                        }
+                        placeholder="API 키를 입력하세요"
+                        rows={3}
+                      />
+                    </div>
+                  )}
                   <div className="grid gap-2">
                     <label htmlFor="budget">월 예산 (USD)</label>
                     <Input
@@ -289,7 +375,7 @@ export default function APIKeyManagement() {
                 <TableRow key={key.id}>
                   <TableCell>
                     <Badge className={getServiceBadgeColor(key.service_name)}>
-                      {key.service_name.toUpperCase()}
+                      {getServiceDisplayName(key.service_name)}
                     </Badge>
                   </TableCell>
                   <TableCell className="font-medium">{key.api_key_name}</TableCell>

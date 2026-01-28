@@ -1,4 +1,4 @@
-// import { getMCPSupabaseClient } from '@/lib/supabase/client' // 임시로 비활성화
+import { getMCPSupabaseClient } from '@/lib/supabase/client'
 
 export interface AdminStats {
   totalUsers: number
@@ -79,7 +79,7 @@ class AdminStatsService {
       }
 
       this.lastCacheUpdate = now
-      return this.cachedStats
+      return this.cachedStats!
     } catch (error) {
       console.error('Failed to fetch admin stats:', error)
       // 에러 발생 시 데모 데이터 반환
@@ -114,7 +114,7 @@ class AdminStatsService {
       .eq('is_active', true)
 
     const count = apiKeys?.length || 0
-    const services = [...new Set(apiKeys?.map(key => key.service_name) || [])]
+    const services = [...new Set(apiKeys?.map((key: any) => key.service_name) || [])] as string[]
 
     return { count, services }
   }
@@ -136,8 +136,8 @@ class AdminStatsService {
         .lt('created_at', thisMonth.toISOString())
     ])
 
-    const thisMonthTokens = thisMonthResult.data?.reduce((sum, log) => sum + (log.tokens_used || 0), 0) || 0
-    const lastMonthTokens = lastMonthResult.data?.reduce((sum, log) => sum + (log.tokens_used || 0), 0) || 1
+    const thisMonthTokens = thisMonthResult.data?.reduce((sum: number, log: any) => sum + (log.tokens_used || 0), 0) || 0
+    const lastMonthTokens = lastMonthResult.data?.reduce((sum: number, log: any) => sum + (log.tokens_used || 0), 0) || 1
 
     const growthPercentage = Math.round(((thisMonthTokens - lastMonthTokens) / lastMonthTokens) * 100)
 
@@ -163,15 +163,15 @@ class AdminStatsService {
         .lt('created_at', thisMonth.toISOString())
     ])
 
-    const thisMonthRevenue = thisMonthResult.data?.reduce((sum, purchase) => sum + (purchase.amount_paid_usd || 0), 0) || 0
-    const lastMonthRevenue = lastMonthResult.data?.reduce((sum, purchase) => sum + (purchase.amount_paid_usd || 0), 0) || 1
+    const thisMonthRevenue = thisMonthResult.data?.reduce((sum: number, purchase: any) => sum + (purchase.amount_paid_usd || 0), 0) || 0
+    const lastMonthRevenue = lastMonthResult.data?.reduce((sum: number, purchase: any) => sum + (purchase.amount_paid_usd || 0), 0) || 1
 
     const growthPercentage = Math.round(((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100)
 
     return { total: thisMonthRevenue, growthPercentage }
   }
 
-  private async getRecentActivities(supabase: any) {
+  private async getRecentActivities(supabase: any): Promise<Array<{ description: string; timeAgo: string; type: 'info' | 'warning' | 'success' }>> {
     // 최근 사용자 등록 확인
     const { data: recentUsers } = await supabase
       .from('users')
@@ -210,7 +210,7 @@ class AdminStatsService {
     if (recentWorkflows?.[0]) {
       const timeDiff = Date.now() - new Date(recentWorkflows[0].created_at).getTime()
       const timeAgo = this.formatTimeAgo(timeDiff)
-      const type = recentWorkflows[0].status === 'failed' ? 'warning' : 'info'
+      const type: 'info' | 'warning' | 'success' = recentWorkflows[0].status === 'failed' ? 'warning' : 'info'
       activities.push({
         description: `워크플로우 ${recentWorkflows[0].status === 'completed' ? '완료' : recentWorkflows[0].status === 'failed' ? '실패' : '실행'}`,
         timeAgo,
@@ -221,8 +221,8 @@ class AdminStatsService {
     // API 사용량 급증 감지 (최근 1시간 토큰 사용량이 평균보다 높은 경우)
     if (recentUsage && recentUsage.length > 5) {
       const recentHourTokens = recentUsage
-        .filter(log => Date.now() - new Date(log.created_at).getTime() < 3600000)
-        .reduce((sum, log) => sum + log.tokens_used, 0)
+        .filter((log: any) => Date.now() - new Date(log.created_at).getTime() < 3600000)
+        .reduce((sum: number, log: any) => sum + log.tokens_used, 0)
 
       if (recentHourTokens > 50000) {
         activities.push({
@@ -243,7 +243,7 @@ class AdminStatsService {
     return activities.slice(0, 3) // 최대 3개만 반환
   }
 
-  private async getSystemStatus(supabase: any) {
+  private async getSystemStatus(supabase: any): Promise<Array<{ service: string; status: 'normal' | 'warning' | 'maintenance' }>> {
     // 실제 시스템 상태 체크
     const status = []
 
@@ -280,10 +280,10 @@ class AdminStatsService {
     }
 
     // 결제 시스템 (Stripe) 상태
-    const stripeKey = apiKeys?.find(key => key.service_name === 'stripe')
+    const stripeKey = apiKeys?.find((key: any) => key.service_name === 'stripe')
     status.push({
       service: '결제 시스템',
-      status: stripeKey ? 'normal' : 'maintenance' as const
+      status: stripeKey ? 'normal' as const : 'maintenance' as const
     })
 
     return status
@@ -313,22 +313,22 @@ class AdminStatsService {
         {
           description: '새 사용자 등록',
           timeAgo: '3분 전',
-          type: 'success'
+          type: 'success' as const
         },
         {
           description: '워크플로우 완료',
           timeAgo: '15분 전',
-          type: 'info'
+          type: 'info' as const
         },
         {
           description: '시스템 백업 완료',
           timeAgo: '1시간 전',
-          type: 'success'
+          type: 'success' as const
         }
       ],
       systemStatus: [
-        { service: '데이터베이스', status: 'normal' },
-        { service: 'AI API 서비스', status: 'normal' },
+        { service: '데이터베이스', status: 'normal' as const },
+        { service: 'AI API 서비스', status: 'normal' as const },
         { service: '결제 시스템', status: 'maintenance' }
       ]
     }
@@ -347,13 +347,13 @@ class AdminStatsService {
         {
           description: '시스템 시작됨',
           timeAgo: '방금 전',
-          type: 'info'
+          type: 'info' as const
         }
       ],
       systemStatus: [
-        { service: '데이터베이스', status: 'warning' },
-        { service: 'AI API 서비스', status: 'warning' },
-        { service: '결제 시스템', status: 'maintenance' }
+        { service: '데이터베이스', status: 'warning' as const },
+        { service: 'AI API 서비스', status: 'warning' as const },
+        { service: '결제 시스템', status: 'maintenance' as const }
       ]
     }
   }

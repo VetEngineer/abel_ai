@@ -51,16 +51,31 @@ export class CopywritingAgent extends BaseAgent {
     )
   }
 
-  async execute(input: CopywritingInput, context: SharedContext): Promise<AgentResult> {
+  async execute(input: any, context: SharedContext): Promise<AgentResult> {
     const startTime = Date.now()
     this.setStatus('processing' as any)
 
     try {
-      const headlines = this.createHeadlines(input)
-      const introHook = this.craftIntroHook(input)
-      const callToActions = this.generateCallToActions(input)
-      const testimonialFramework = this.buildTestimonialFramework(input)
-      const persuasionElements = this.createPersuasionElements(input)
+      // 입력 데이터 정규화 처리
+      const seoData = input?.metaData ? input : input?.seoData || {}
+      const specialization = input?.specialization || context?.platform || 'other'
+      const brandVoice = input?.brandVoice || context?.brandTone || '전문적인'
+      const targetAudience = input?.targetAudience || context?.targetAudience || '일반 사용자'
+      const contentGoals = input?.contentGoals || context?.contentGoal || 'engagement'
+
+      const normalizedInput = {
+        seoData,
+        specialization,
+        brandVoice,
+        targetAudience,
+        contentGoals
+      }
+
+      const headlines = this.createHeadlines(normalizedInput)
+      const introHook = this.craftIntroHook(normalizedInput)
+      const callToActions = this.generateCallToActions(normalizedInput)
+      const testimonialFramework = this.buildTestimonialFramework(normalizedInput)
+      const persuasionElements = this.createPersuasionElements(normalizedInput)
 
       const output: CopywritingOutput = {
         headlines,
@@ -80,12 +95,12 @@ export class CopywritingAgent extends BaseAgent {
     }
   }
 
-  private createHeadlines(input: CopywritingInput) {
-    const { seoData, specialization, targetAudience } = input
-    const primaryTopic = seoData.headings.h1
+  private createHeadlines(input: any) {
+    const { seoData, specialization, targetAudience, contentGoals } = input
+    const primaryTopic = seoData?.headings?.h1 || seoData?.metaData?.title || '전문 가이드'
 
     const specializationCredential = this.getSpecializationCredential(specialization)
-    const urgencyWord = this.getUrgencyWord(input.contentGoals)
+    const urgencyWord = this.getUrgencyWord(contentGoals)
     const benefitWord = this.getBenefitWord(specialization)
 
     const main = `${specializationCredential}가 알려주는 ${primaryTopic} ${urgencyWord} 가이드`
@@ -98,7 +113,8 @@ export class CopywritingAgent extends BaseAgent {
       `${targetAudience}가 반드시 알아야 할 ${primaryTopic}`
     ]
 
-    const subHeadlines = seoData.headings.h2.map(h2 =>
+    const h2Array = seoData?.headings?.h2 || ['주요 내용', '핵심 포인트', '실무 적용']
+    const subHeadlines = h2Array.map((h2: string) =>
       this.optimizeSubHeadline(h2, specialization)
     )
 
@@ -151,9 +167,9 @@ export class CopywritingAgent extends BaseAgent {
     return `${h2}을 ${randomAction}`
   }
 
-  private craftIntroHook(input: CopywritingInput) {
+  private craftIntroHook(input: any) {
     const { targetAudience, specialization, seoData } = input
-    const mainTopic = seoData.headings.h1
+    const mainTopic = seoData?.headings?.h1 || seoData?.metaData?.title || '전문 서비스'
 
     const opening = `${targetAudience}께서 ${mainTopic}에 대해 고민하고 계신가요?`
 
@@ -172,7 +188,7 @@ export class CopywritingAgent extends BaseAgent {
     }
   }
 
-  private generateCallToActions(input: CopywritingInput) {
+  private generateCallToActions(input: any) {
     const { specialization, targetAudience } = input
     const credential = this.getSpecializationCredential(specialization)
 
@@ -197,7 +213,7 @@ export class CopywritingAgent extends BaseAgent {
     }
   }
 
-  private buildTestimonialFramework(input: CopywritingInput) {
+  private buildTestimonialFramework(input: any) {
     const { specialization, targetAudience } = input
 
     const suggestedQuotes = [
@@ -229,7 +245,7 @@ export class CopywritingAgent extends BaseAgent {
     }
   }
 
-  private createPersuasionElements(input: CopywritingInput) {
+  private createPersuasionElements(input: any) {
     const { specialization, targetAudience, contentGoals } = input
 
     const urgencyTriggers = [

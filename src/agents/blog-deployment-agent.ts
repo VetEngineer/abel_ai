@@ -78,17 +78,26 @@ export class BlogDeploymentAgent extends BaseAgent {
     )
   }
 
-  async execute(input: BlogDeploymentInput, context: SharedContext): Promise<AgentResult> {
+  async execute(input: any, context: SharedContext): Promise<AgentResult> {
     const startTime = Date.now()
     this.setStatus('processing' as any)
 
     try {
-      const deploymentPlan = this.createDeploymentPlan(input)
-      const platformOptimizations = this.optimizeForPlatforms(input)
-      const crossPlatformSyndication = this.setupCrossPlatformSyndication(input)
-      const analyticsAndTracking = this.setupAnalyticsAndTracking(input)
-      const seoDeployment = this.prepareSEODeployment(input)
-      const postDeploymentTasks = this.definePostDeploymentTasks(input)
+      // 입력 데이터 정규화 처리
+      const normalizedInput = {
+        approvedContent: input?.qualityAssessment ? input : input?.approvedContent || {},
+        seoData: input?.metaData ? input : input?.seoData || {},
+        visualData: input?.colorScheme ? input : input?.visualData || {},
+        platforms: input?.platforms || ['wordpress', 'naver_blog'],
+        schedulingPreferences: input?.schedulingPreferences || {}
+      }
+
+      const deploymentPlan = this.createDeploymentPlan(normalizedInput)
+      const platformOptimizations = this.optimizeForPlatforms(normalizedInput)
+      const crossPlatformSyndication = this.setupCrossPlatformSyndication(normalizedInput)
+      const analyticsAndTracking = this.setupAnalyticsAndTracking(normalizedInput)
+      const seoDeployment = this.prepareSEODeployment(normalizedInput)
+      const postDeploymentTasks = this.definePostDeploymentTasks(normalizedInput)
 
       const output: BlogDeploymentOutput = {
         deploymentPlan,
@@ -109,12 +118,12 @@ export class BlogDeploymentAgent extends BaseAgent {
     }
   }
 
-  private createDeploymentPlan(input: BlogDeploymentInput) {
+  private createDeploymentPlan(input: any) {
     const { platforms, schedulingPreferences } = input
     const currentTime = new Date()
 
     // 플랫폼별 배포 계획 수립
-    const platformPlans = platforms.map((platform, index) => {
+    const platformPlans = platforms.map((platform: any, index: number) => {
       const publishTime = this.calculatePublishTime(
         currentTime,
         schedulingPreferences,
@@ -178,7 +187,7 @@ export class BlogDeploymentAgent extends BaseAgent {
     return delays[platform] || (index * 5)
   }
 
-  private getPlatformCustomizations(platform: string, input: BlogDeploymentInput) {
+  private getPlatformCustomizations(platform: string, input: any) {
     const customizations: Record<string, any> = {}
 
     switch (platform) {
@@ -226,7 +235,7 @@ export class BlogDeploymentAgent extends BaseAgent {
     return customizations
   }
 
-  private getNaverCategory(input: BlogDeploymentInput): string {
+  private getNaverCategory(input: any): string {
     // 네이버 블로그 카테고리 매핑
     const categoryMap: Record<string, string> = {
       'medical': '건강정보',
@@ -243,11 +252,11 @@ export class BlogDeploymentAgent extends BaseAgent {
     return categoryMap['other'] || '일반정보'
   }
 
-  private getTistoryCategory(input: BlogDeploymentInput): string {
+  private getTistoryCategory(input: any): string {
     return '전문정보' // 기본 카테고리
   }
 
-  private getFacebookTargeting(input: BlogDeploymentInput): Record<string, any> {
+  private getFacebookTargeting(input: any): Record<string, any> {
     return {
       age_min: 25,
       age_max: 65,
@@ -284,14 +293,14 @@ export class BlogDeploymentAgent extends BaseAgent {
     return latestTime.toISOString()
   }
 
-  private optimizeForPlatforms(input: BlogDeploymentInput) {
-    return input.platforms.map(platform => ({
+  private optimizeForPlatforms(input: any) {
+    return input.platforms.map((platform: any) => ({
       platform,
       optimizations: this.getPlatformOptimization(platform, input)
     }))
   }
 
-  private getPlatformOptimization(platform: string, input: BlogDeploymentInput) {
+  private getPlatformOptimization(platform: string, input: any) {
     const baseTitle = input.approvedContent?.content?.title || input.seoData?.metaData?.title || '제목'
     const baseDescription = input.seoData?.metaData?.description || '설명'
 
@@ -412,7 +421,7 @@ export class BlogDeploymentAgent extends BaseAgent {
     return `${description} #ProfessionalAdvice #BusinessGrowth`
   }
 
-  private getWordPressImages(input: BlogDeploymentInput): string[] {
+  private getWordPressImages(input: any): string[] {
     return [
       'featured-image-optimized.jpg',
       'content-image-1.jpg',
@@ -420,7 +429,7 @@ export class BlogDeploymentAgent extends BaseAgent {
     ]
   }
 
-  private getNaverImages(input: BlogDeploymentInput): string[] {
+  private getNaverImages(input: any): string[] {
     return [
       'naver-thumbnail.jpg',
       'naver-content-1.jpg',
@@ -428,48 +437,48 @@ export class BlogDeploymentAgent extends BaseAgent {
     ]
   }
 
-  private getTistoryImages(input: BlogDeploymentInput): string[] {
+  private getTistoryImages(input: any): string[] {
     return [
       'tistory-header.jpg',
       'tistory-content.jpg'
     ]
   }
 
-  private getBrunchImages(input: BlogDeploymentInput): string[] {
+  private getBrunchImages(input: any): string[] {
     return [
       'brunch-cover-high-res.jpg',
       'brunch-content-artistic.jpg'
     ]
   }
 
-  private getLinkedInImages(input: BlogDeploymentInput): string[] {
+  private getLinkedInImages(input: any): string[] {
     return [
       'linkedin-professional.jpg',
       'linkedin-infographic.jpg'
     ]
   }
 
-  private getWordPressTags(input: BlogDeploymentInput): string[] {
+  private getWordPressTags(input: any): string[] {
     return ['전문가', '가이드', '실무', '컨설팅']
   }
 
-  private getNaverTags(input: BlogDeploymentInput): string[] {
+  private getNaverTags(input: any): string[] {
     return ['전문정보', '실무팁', '가이드', '상담']
   }
 
-  private getTistoryTags(input: BlogDeploymentInput): string[] {
+  private getTistoryTags(input: any): string[] {
     return ['전문가', '실무', '가이드']
   }
 
-  private getBrunchTags(input: BlogDeploymentInput): string[] {
+  private getBrunchTags(input: any): string[] {
     return ['전문가인사이트', '실무가이드', '전문지식']
   }
 
-  private getLinkedInTags(input: BlogDeploymentInput): string[] {
+  private getLinkedInTags(input: any): string[] {
     return ['ProfessionalAdvice', 'BusinessGrowth', 'Industry', 'Consulting']
   }
 
-  private setupCrossPlatformSyndication(input: BlogDeploymentInput) {
+  private setupCrossPlatformSyndication(input: any) {
     const canonicalUrl = this.generateCanonicalUrl(input)
     const socialMediaPosts = this.generateSocialMediaPosts(input)
     const newsletterContent = this.generateNewsletterContent(input)
@@ -481,7 +490,7 @@ export class BlogDeploymentAgent extends BaseAgent {
     }
   }
 
-  private generateCanonicalUrl(input: BlogDeploymentInput): string {
+  private generateCanonicalUrl(input: any): string {
     // 주 플랫폼을 canonical URL로 설정
     const mainPlatform = input.platforms[0] || 'wordpress'
     const slug = this.generateSlug(input.approvedContent?.content?.title || 'article')
@@ -497,7 +506,7 @@ export class BlogDeploymentAgent extends BaseAgent {
       .slice(0, 50)
   }
 
-  private generateSocialMediaPosts(input: BlogDeploymentInput) {
+  private generateSocialMediaPosts(input: any) {
     const title = input.approvedContent?.content?.title || '새 글'
     const description = input.seoData?.metaData?.description || ''
 
@@ -523,7 +532,7 @@ export class BlogDeploymentAgent extends BaseAgent {
     ]
   }
 
-  private generateNewsletterContent(input: BlogDeploymentInput) {
+  private generateNewsletterContent(input: any) {
     const title = input.approvedContent?.content?.title || '새로운 전문가 가이드'
     const description = input.seoData?.metaData?.description || ''
 
@@ -548,7 +557,7 @@ ${description}
     }
   }
 
-  private setupAnalyticsAndTracking(input: BlogDeploymentInput) {
+  private setupAnalyticsAndTracking(input: any) {
     const trackingCodes = this.generateTrackingCodes(input.platforms)
     const analyticsEvents = this.defineAnalyticsEvents()
     const performanceMetrics = this.definePerformanceMetrics()
@@ -615,7 +624,7 @@ ${description}
     ]
   }
 
-  private prepareSEODeployment(input: BlogDeploymentInput) {
+  private prepareSEODeployment(input: any) {
     const metaTags = this.generateMetaTags(input)
     const structuredData = input.seoData?.structuredData || {}
     const robotsTxt = this.generateRobotsTxt()
@@ -629,7 +638,7 @@ ${description}
     }
   }
 
-  private generateMetaTags(input: BlogDeploymentInput): Record<string, string> {
+  private generateMetaTags(input: any): Record<string, string> {
     const seoData = input.seoData?.metaData || {}
 
     return {
@@ -658,7 +667,7 @@ ${description}
     ]
   }
 
-  private definePostDeploymentTasks(input: BlogDeploymentInput) {
+  private definePostDeploymentTasks(input: any) {
     const socialMediaPromotion = this.defineSocialMediaPromotion(input)
     const emailNotifications = this.defineEmailNotifications()
     const monitoringTasks = this.defineMonitoringTasks()
@@ -672,7 +681,7 @@ ${description}
     }
   }
 
-  private defineSocialMediaPromotion(input: BlogDeploymentInput): string[] {
+  private defineSocialMediaPromotion(input: any): string[] {
     return [
       '페이스북 페이지에 게시물 발행',
       '링크드인 프로필에 전문가 콘텐츠로 공유',

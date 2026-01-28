@@ -10,6 +10,7 @@ import { Home, ArrowLeft, LogOut } from 'lucide-react'
 import APIKeyManagement from '@/components/admin/APIKeyManagement'
 import UserManagement from '@/components/admin/UserManagement'
 import SystemMonitoring from '@/components/admin/SystemMonitoring'
+import AdminAccountManagement from '@/components/admin/AdminAccountManagement'
 import { adminStatsService, type AdminStats } from '@/lib/services/admin-stats-service'
 
 export default function AdminPanel() {
@@ -131,9 +132,10 @@ export default function AdminPanel() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="overview">개요</TabsTrigger>
             <TabsTrigger value="api-keys">API 키 관리</TabsTrigger>
+            <TabsTrigger value="admin-accounts">관리자 계정</TabsTrigger>
             <TabsTrigger value="users">사용자 관리</TabsTrigger>
             <TabsTrigger value="monitoring">시스템 모니터링</TabsTrigger>
           </TabsList>
@@ -275,6 +277,10 @@ export default function AdminPanel() {
 
           <TabsContent value="api-keys">
             <APIKeyManagement />
+          </TabsContent>
+
+          <TabsContent value="admin-accounts">
+            <AdminAccountManagement />
           </TabsContent>
 
           <TabsContent value="users">
