@@ -1,6 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { getBrowserSupabaseClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -20,7 +22,8 @@ import {
   Shield,
   ChevronRight,
   Play,
-  Settings
+  Settings,
+  Loader2
 } from 'lucide-react'
 import ContentCreationForm from '@/components/ContentCreationForm'
 import WorkflowStatus from '@/components/WorkflowStatus'
@@ -29,13 +32,48 @@ import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 
 export default function Home() {
+  const router = useRouter()
   const [currentWorkflowId, setCurrentWorkflowId] = useState<string | null>(null)
   const [showDemo, setShowDemo] = useState(false)
+  const [session, setSession] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
 
   const demoProjectId = '550e8400-e29b-41d4-a716-446655440001'
 
+  useEffect(() => {
+    // 세션 확인
+    const checkSession = async () => {
+      try {
+        const supabase = getBrowserSupabaseClient()
+        if (!supabase) {
+          setLoading(false)
+          return
+        }
+
+        const { data: { session } } = await supabase.auth.getSession()
+
+        if (!session) {
+          router.push('/login')
+        } else {
+          setSession(session)
+        }
+      } catch (error) {
+        console.error('Session check error:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    checkSession()
+  }, [router])
+
   const handleWorkflowCreated = (workflowId: string) => {
     setCurrentWorkflowId(workflowId)
+  }
+
+  // 로딩 중이거나 세션이 없으면 (리다이렉트 전) 아무것도 안 보여줌
+  if (loading || (!session && process.env.NODE_ENV === 'production')) { // 개발 모드 편의상 프로덕션에서만 강제 차단 권장
+    return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin" /></div>
   }
 
   return (
@@ -128,7 +166,7 @@ export default function Home() {
                     </span>
                   </h1>
                   <p className="mx-auto mt-6 max-w-2xl text-xl text-muted-foreground leading-relaxed">
-                    단순한 텍스트 생성을 넘어, 11개의 전문 AI 에이전트가 
+                    단순한 텍스트 생성을 넘어, 11개의 전문 AI 에이전트가
                     브랜드 전략부터 SEO 최적화, 다중 플랫폼 배포까지 완벽하게 처리합니다.
                   </p>
                   <div className="mt-12 flex flex-col sm:flex-row justify-center gap-4">
@@ -231,7 +269,7 @@ export default function Home() {
                   <div className="relative z-10">
                     <h2 className="text-3xl md:text-5xl font-bold mb-6">지금 바로 무료로 시작하세요</h2>
                     <p className="text-lg md:text-xl opacity-90 mb-10 max-w-2xl mx-auto">
-                      AI 에이전트와 함께라면 블로그 운영이 즐거워집니다. 
+                      AI 에이전트와 함께라면 블로그 운영이 즐거워집니다.
                       번거로운 작업은 AI에게 맡기고 전략에 더 집중하세요.
                     </p>
                     <div className="flex flex-col sm:flex-row justify-center gap-4">
