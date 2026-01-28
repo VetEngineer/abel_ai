@@ -52,9 +52,7 @@ export default function Home() {
 
         const { data: { session } } = await supabase.auth.getSession()
 
-        if (!session) {
-          router.push('/login')
-        } else {
+        if (session) {
           setSession(session)
         }
       } catch (error) {
@@ -71,14 +69,14 @@ export default function Home() {
     setCurrentWorkflowId(workflowId)
   }
 
-  // 로딩 중이거나 세션이 없으면 (리다이렉트 전) 아무것도 안 보여줌
-  if (loading || (!session && process.env.NODE_ENV === 'production')) { // 개발 모드 편의상 프로덕션에서만 강제 차단 권장
+  // 로딩 상태 처리 (선택적)
+  if (loading) {
     return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin" /></div>
   }
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <Navbar onShowDemo={setShowDemo} />
+      <Navbar onShowDemo={setShowDemo} session={session} />
 
       <main className="flex-grow">
         {showDemo ? (

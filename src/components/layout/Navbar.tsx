@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Bot, Menu, Play } from 'lucide-react'
+import { Bot, Menu, Play, LogIn, LogOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import {
@@ -12,15 +12,23 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet'
+import { useRouter } from 'next/navigation'
+import { getBrowserSupabaseClient } from '@/lib/supabase/client'
 
 interface NavbarProps {
   onShowDemo: (show: boolean) => void
+  session?: any
 }
 
-export default function Navbar({ onShowDemo }: NavbarProps) {
+export default function Navbar({ onShowDemo, session }: NavbarProps) {
   const [isOpen, setIsOpen] = useState(false)
+  const router = useRouter()
 
   const handleDemoClick = () => {
+    if (!session) {
+      router.push('/login')
+      return
+    }
     onShowDemo(true)
     setIsOpen(false)
   }
@@ -30,13 +38,28 @@ export default function Navbar({ onShowDemo }: NavbarProps) {
     setIsOpen(false)
   }
 
+  const handleLoginClick = () => {
+    router.push('/login')
+    setIsOpen(false)
+  }
+
+  const handleLogoutClick = async () => {
+    const supabase = getBrowserSupabaseClient()
+    if (supabase) {
+      await supabase.auth.signOut()
+      router.refresh()
+      window.location.reload()
+    }
+    setIsOpen(false)
+  }
+
   return (
     <nav className="sticky top-0 z-50 border-b border-border/50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
-            <div 
-              className="flex-shrink-0 flex items-center cursor-pointer group" 
+            <div
+              className="flex-shrink-0 flex items-center cursor-pointer group"
               onClick={() => onShowDemo(false)}
             >
               <div className="p-1.5 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
@@ -58,10 +81,20 @@ export default function Navbar({ onShowDemo }: NavbarProps) {
               FAQ
             </a>
             <Separator orientation="vertical" className="h-4" />
-            <Button variant="ghost" size="sm" asChild className="text-muted-foreground">
-              <a href="/admin">관리자 패널</a>
-            </Button>
-            <Button size="sm" onClick={() => onShowDemo(true)} className="btn-primary-enhanced rounded-full px-5">
+
+            {session ? (
+              <Button variant="ghost" size="sm" onClick={handleLogoutClick} className="text-muted-foreground">
+                <LogOut className="w-4 h-4 mr-2" />
+                로그아웃
+              </Button>
+            ) : (
+              <Button variant="ghost" size="sm" onClick={handleLoginClick} className="text-muted-foreground">
+                <LogIn className="w-4 h-4 mr-2" />
+                로그인
+              </Button>
+            )}
+
+            <Button size="sm" onClick={handleDemoClick} className="btn-primary-enhanced rounded-full px-5">
               <Play className="w-3.5 h-3.5 mr-2 fill-current" />
               데모 시작
             </Button>
@@ -86,22 +119,22 @@ export default function Navbar({ onShowDemo }: NavbarProps) {
                   </SheetDescription>
                 </SheetHeader>
                 <div className="mt-8 space-y-2">
-                  <a 
-                    href="#features" 
+                  <a
+                    href="#features"
                     className="flex items-center w-full p-4 text-lg font-semibold rounded-xl hover:bg-muted transition-colors"
                     onClick={handleLinkClick}
                   >
                     주요 기능
                   </a>
-                  <a 
-                    href="#agents" 
+                  <a
+                    href="#agents"
                     className="flex items-center w-full p-4 text-lg font-semibold rounded-xl hover:bg-muted transition-colors"
                     onClick={handleLinkClick}
                   >
                     AI 에이전트
                   </a>
-                  <a 
-                    href="#faq" 
+                  <a
+                    href="#faq"
                     className="flex items-center w-full p-4 text-lg font-semibold rounded-xl hover:bg-muted transition-colors"
                     onClick={handleLinkClick}
                   >
@@ -109,9 +142,18 @@ export default function Navbar({ onShowDemo }: NavbarProps) {
                   </a>
                   <Separator className="my-4" />
                   <div className="space-y-3 pt-2">
-                    <Button variant="outline" className="w-full h-12 justify-start px-4 text-base rounded-xl" asChild>
-                      <a href="/admin">관리자 패널</a>
-                    </Button>
+                    {session ? (
+                      <Button variant="outline" onClick={handleLogoutClick} className="w-full h-12 justify-start px-4 text-base rounded-xl">
+                        <LogOut className="w-4 h-4 mr-2" />
+                        로그아웃
+                      </Button>
+                    ) : (
+                      <Button variant="outline" onClick={handleLoginClick} className="w-full h-12 justify-start px-4 text-base rounded-xl">
+                        <LogIn className="w-4 h-4 mr-2" />
+                        로그인
+                      </Button>
+                    )}
+
                     <Button onClick={handleDemoClick} className="w-full h-12 text-base rounded-xl btn-primary-enhanced">
                       <Play className="w-4 h-4 mr-2 fill-current" />
                       데모 시작하기
