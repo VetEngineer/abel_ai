@@ -167,7 +167,8 @@ async function executeRealWorkflow(
       targetAudience,
       contentGoal: 'engagement',
       brandTone: brandVoice,
-      platform: 'blog'
+      platform: 'blog',
+      userId
     }
 
     console.log(`실제 워크플로우 실행 시작: ${workflowId}`)

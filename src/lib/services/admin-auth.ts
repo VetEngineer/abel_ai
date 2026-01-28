@@ -1,6 +1,12 @@
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
+import { TOTP } from 'otplib'
+import { generateSecret, generateURI, verify } from 'otplib'
+import QRCode from 'qrcode'
 import { getMCPSupabaseClient, AdminAccount, AdminSession } from '@/lib/supabase/client'
+
+// TOTP 인스턴스 생성
+const totp = new TOTP()
 
 export interface AuthUser {
   id: string
@@ -8,6 +14,7 @@ export interface AuthUser {
   email: string | null
   role: 'super_admin' | 'admin' | 'moderator'
   isActive: boolean
+  isMfaEnabled?: boolean
 }
 
 export interface LoginResult {
@@ -15,6 +22,8 @@ export interface LoginResult {
   user?: AuthUser
   token?: string
   error?: string
+  requireMFA?: boolean
+  tempToken?: string
 }
 
 export interface CreateAdminAccountData {
@@ -73,12 +82,65 @@ class AdminAuthService {
         username: decoded.username,
         email: decoded.email || null,
         role: decoded.role,
-        isActive: true // JWT가 유효하면 활성 상태로 간주
+        isActive: true,
+        isMfaEnabled: false
       }
     } catch (error) {
       console.error('JWT 토큰 검증 실패:', error)
       return null
     }
+  }
+
+  // MFA 시크릿 생성
+  async generateMFASetup(userId: string, email: string) {
+    const secret = generateSecret()
+    const otpauth = generateURI({ secret, issuer: 'BlogAutomationAdmin', label: email })
+    const qrCode = await QRCode.toDataURL(otpauth)
+
+    return { secret, qrCode }
+  }
+
+  // MFA 활성화 (검증 포함)
+  async enableMFA(userId: string, token: string, secret: string): Promise<boolean> {
+    const result = await verify({ token, secret })
+    if (!result.valid) return false
+
+    // DB에 시크릿 저장 및 활성화
+    const supabase = await getMCPSupabaseClient()
+    await supabase.from('admin_accounts')
+      .update({
+        totp_secret: secret,
+        is_mfa_enabled: true
+      })
+      .eq('id', userId)
+
+    return true
+  }
+
+  // MFA 비활성화
+  async disableMFA(userId: string): Promise<void> {
+    const supabase = await getMCPSupabaseClient()
+    await supabase.from('admin_accounts')
+      .update({
+        totp_secret: null,
+        is_mfa_enabled: false
+      })
+      .eq('id', userId)
+  }
+
+  // MFA 토큰 검증
+  async verifyMFAToken(userId: string, token: string): Promise<boolean> {
+    const supabase = await getMCPSupabaseClient()
+    const { data: admin } = await supabase
+      .from('admin_accounts')
+      .select('totp_secret')
+      .eq('id', userId)
+      .single()
+
+    if (!admin || !admin.totp_secret) return false
+
+    const result = await verify({ token, secret: admin.totp_secret })
+    return result.valid
   }
 
   // 로그인 시도
@@ -90,8 +152,6 @@ class AdminAuthService {
       }
 
       const supabase = await getMCPSupabaseClient()
-
-      // 사용자 조회
       const { data: admin, error } = await supabase
         .from('admin_accounts')
         .select('*')
@@ -100,48 +160,88 @@ class AdminAuthService {
         .single()
 
       if (error || !admin) {
-        console.log('관리자 계정을 찾을 수 없습니다:', username)
         return { success: false, error: '사용자명 또는 비밀번호가 올바르지 않습니다.' }
       }
 
       // 비밀번호 검증
       const isPasswordValid = await this.verifyPassword(password, admin.password_hash)
       if (!isPasswordValid) {
-        console.log('비밀번호 불일치:', username)
         return { success: false, error: '사용자명 또는 비밀번호가 올바르지 않습니다.' }
       }
 
-      // 마지막 로그인 시간 업데이트
-      await supabase
-        .from('admin_accounts')
-        .update({ last_login_at: new Date().toISOString() })
-        .eq('id', admin.id)
-
-      const user: AuthUser = {
-        id: admin.id,
-        username: admin.username,
-        email: admin.email,
-        role: admin.role,
-        isActive: admin.is_active
+      // MFA 확인
+      if (admin.is_mfa_enabled) {
+        // 임시 토큰 생성 (MFA 검증용, 짧은 만료 시간)
+        const tempToken = jwt.sign(
+          { id: admin.id, type: 'mfa_pending' },
+          this.jwtSecret,
+          { expiresIn: '5m' }
+        )
+        return {
+          success: false,
+          requireMFA: true,
+          tempToken: tempToken
+        }
       }
 
-      const token = this.generateToken(user)
-
-      // 세션 저장 (선택적)
-      try {
-        await this.createSession(admin.id, token, ipAddress, userAgent)
-      } catch (sessionError) {
-        console.warn('세션 저장 실패:', sessionError)
-        // 세션 저장 실패는 로그인 성공에 영향을 주지 않음
-      }
-
-      console.log('로그인 성공:', username)
-      return { success: true, user, token }
+      return this.finalizeLogin(admin, ipAddress, userAgent)
 
     } catch (error) {
       console.error('로그인 처리 오류:', error)
       return { success: false, error: '로그인 처리 중 오류가 발생했습니다.' }
     }
+  }
+
+  // MFA 검증 후 최종 로그인 처리
+  async verifyMFAAndLogin(tempToken: string, otp: string, ipAddress?: string, userAgent?: string): Promise<LoginResult> {
+    try {
+      const decoded = jwt.verify(tempToken, this.jwtSecret) as any
+      if (decoded.type !== 'mfa_pending') throw new Error('Invalid token type')
+
+      const userId = decoded.id
+      const isValid = await this.verifyMFAToken(userId, otp)
+
+      if (!isValid) {
+        return { success: false, error: 'OTP 코드가 올바르지 않습니다.' }
+      }
+
+      // 관리자 정보 조회
+      const supabase = await getMCPSupabaseClient()
+      const { data: admin } = await supabase.from('admin_accounts').select('*').eq('id', userId).single()
+
+      return this.finalizeLogin(admin, ipAddress, userAgent)
+
+    } catch (error) {
+      return { success: false, error: '인증 세션이 만료되었거나 유효하지 않습니다.' }
+    }
+  }
+
+  // 로그인 성공 공통 처리
+  private async finalizeLogin(admin: any, ipAddress?: string, userAgent?: string): Promise<LoginResult> {
+    const supabase = await getMCPSupabaseClient()
+    await supabase
+      .from('admin_accounts')
+      .update({ last_login_at: new Date().toISOString() })
+      .eq('id', admin.id)
+
+    const user: AuthUser = {
+      id: admin.id,
+      username: admin.username,
+      email: admin.email,
+      role: admin.role,
+      isActive: admin.is_active,
+      isMfaEnabled: admin.is_mfa_enabled
+    }
+
+    const token = this.generateToken(user)
+
+    try {
+      await this.createSession(admin.id, token, ipAddress, userAgent)
+    } catch (sessionError) {
+      console.warn('세션 저장 실패:', sessionError)
+    }
+
+    return { success: true, user, token }
   }
 
   // Supabase 대체 로그인 (환경변수 기반)
@@ -161,7 +261,8 @@ class AdminAuthService {
         username: envUsername,
         email: null,
         role: 'super_admin',
-        isActive: true
+        isActive: true,
+        isMfaEnabled: false
       }
 
       const token = this.generateToken(user)

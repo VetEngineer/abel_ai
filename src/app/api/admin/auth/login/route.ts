@@ -15,9 +15,9 @@ export async function POST(request: NextRequest) {
 
     // 클라이언트 정보 수집
     const ipAddress = request.headers.get('x-forwarded-for') ||
-                     request.headers.get('x-real-ip') ||
-                     request.ip ||
-                     'unknown'
+      request.headers.get('x-real-ip') ||
+      request.ip ||
+      'unknown'
 
     const userAgent = request.headers.get('user-agent') || 'unknown'
 
@@ -43,6 +43,7 @@ export async function POST(request: NextRequest) {
         email: result.user!.email,
         role: result.user!.role
       },
+      token: result.token,
       message: '로그인이 성공했습니다.'
     })
 

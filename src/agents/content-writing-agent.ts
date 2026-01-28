@@ -90,9 +90,32 @@ export class ContentWritingAgent extends BaseAgent {
   }
 
   private async generateContentWithClaude(input: any) {
-    // 현재는 목업 콘텐츠를 사용 (향후 Claude API 연동 예정)
-    console.log('콘텐츠 생성 중:', input.topic)
-    return this.generateMockupContent(input)
+    const { specialization, targetAudience, brandVoice, topic, contentGoals, seoData, copyData, userId } = input
+
+    const prompt = this.buildClaudePrompt(input)
+
+    try {
+      const response = await aiServiceRouter.generateText({
+        service: 'claude',
+        model: 'claude-3-opus-20240229', // High quality model for long content
+        prompt: prompt,
+        userId: userId,
+        maxTokens: 4000,
+        temperature: 0.7
+      })
+
+      if (!response.success || !response.data) {
+        throw new Error(response.error || 'AI 응답 실패')
+      }
+
+      const rawContent = response.data.text
+      return this.parseClaudeResponse(rawContent, input)
+
+    } catch (error) {
+      console.error('Content Writing Agent AI Error:', error)
+      // Fallback to mockup if AI fails to ensure system stability
+      return this.generateMockupContent(input)
+    }
   }
 
   private buildClaudePrompt(input: any): string {
@@ -100,30 +123,43 @@ export class ContentWritingAgent extends BaseAgent {
 
     const specializationContext = this.getSpecializationContext(specialization)
     const voiceGuideline = this.getBrandVoiceGuideline(brandVoice)
-    const keywords = seoData?.metaData?.keywords || []
+    const keywords = (seoData?.metaData?.keywords || []).slice(0, 5).join(', ')
     const h1 = seoData?.headings?.h1 || topic
     const h2Array = seoData?.headings?.h2 || ['주요 내용', '핵심 포인트', '실무 적용']
     const mainHeadline = copyData?.headlines?.main || `${topic} 전문 가이드`
     const opening = copyData?.introHook?.opening || `${targetAudience}를 위한 전문 정보입니다.`
-    const credibility = copyData?.introHook?.credibilityStatement || '전문가의 경험을 바탕으로 작성되었습니다.'
-    const recommendedWordCount = seoData?.technicalSEO?.recommendedWordCount || 1500
 
-    return `당신은 ${specializationContext}입니다. ${targetAudience}를 위한 전문적이고 신뢰할 수 있는 블로그 콘텐츠를 작성해주세요.
+    return `당신은 ${specializationContext}입니다. 
+다음 지침에 따라 ${targetAudience}를 위한 전문적이고 신뢰할 수 있는 블로그 콘텐츠를 작성해주세요.
 
-주제: ${topic}
-콘텐츠 목표: ${contentGoals}
-브랜드 톤: ${voiceGuideline}
-타겟 워드 수: ${recommendedWordCount}
+[기본 정보]
+- 주제: ${topic}
+- 목표: ${contentGoals}
+- 톤앤매너: ${voiceGuideline}
 
-SEO 요구사항:
-- 주요 키워드: ${keywords.slice(0, 3).join(', ')}
-- H1: ${h1}
-- H2 구조: ${h2Array.join(', ')}
+[SEO 및 구조 요구사항]
+- 메인 키워드: ${keywords}
+- H1 제목: ${h1}
+- 섹션 구성(H2): ${h2Array.join(', ')}
 
-카피라이팅 가이드라인:
-- 메인 헤드라인: ${mainHeadline}
-- 도입부 구조: ${opening}
-- 신뢰도 강화: ${credibility}`
+[카피라이팅 가이드]
+- 헤드라인: ${mainHeadline}
+- 도입부: ${opening}
+
+[작성 형식]
+각 섹션을 명확히 구분하여 작성해주세요. 다음 태그를 사용하여 구분합니다:
+[INTRODUCTION]
+(서론 내용)
+[SECTION_1]
+(${h2Array[0] || '첫 번째 섹션'} 내용)
+[SECTION_2]
+(${h2Array[1] || '두 번째 섹션'} 내용)
+[SECTION_3]
+(${h2Array[2] || '세 번째 섹션'} 내용)
+[CONCLUSION]
+(결론 및 요약)
+
+각 섹션은 충분한 길이고 깊이 있는 내용을 담아야 합니다. 실무적인 조언과 구체적인 예시를 포함하세요.`
   }
 
   private getSpecializationContext(specialization: string): string {

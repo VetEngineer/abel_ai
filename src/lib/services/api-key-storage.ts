@@ -1,20 +1,6 @@
 // 메모리 기반 API 키 스토리지 시스템
 
-export interface StoredAPIKey {
-  id: string
-  service_name: 'claude' | 'openai' | 'gemini' | 'stripe' | 'naver_search' | 'naver_datalab'
-  api_key?: string // Claude, OpenAI, Gemini용
-  client_id?: string // 네이버 API용
-  client_secret?: string // 네이버 API용
-  api_key_name: string
-  is_active: boolean
-  rate_limit_per_minute: number
-  monthly_budget_usd: number
-  current_month_cost: number
-  usage_count: number
-  last_used?: string
-  created_at: string
-}
+import { APIKeyStorage, StoredAPIKey } from './api-key-storage-interface'
 
 // 전역 메모리 스토리지
 declare global {
@@ -27,8 +13,8 @@ if (!globalThis.apiKeyStorage) {
 
 const storage = globalThis.apiKeyStorage
 
-class APIKeyStorage {
-  private static instance: APIKeyStorage
+export class MemoryAPIKeyStorage implements APIKeyStorage {
+  private static instance: MemoryAPIKeyStorage
   private storage: Map<string, StoredAPIKey>
 
   private constructor() {
@@ -36,11 +22,11 @@ class APIKeyStorage {
     this.initializeFromEnv()
   }
 
-  public static getInstance(): APIKeyStorage {
-    if (!APIKeyStorage.instance) {
-      APIKeyStorage.instance = new APIKeyStorage()
+  public static getInstance(): MemoryAPIKeyStorage {
+    if (!MemoryAPIKeyStorage.instance) {
+      MemoryAPIKeyStorage.instance = new MemoryAPIKeyStorage()
     }
-    return APIKeyStorage.instance
+    return MemoryAPIKeyStorage.instance
   }
 
   // 환경 변수에서 초기 API 키 로드
@@ -180,7 +166,7 @@ class APIKeyStorage {
   }
 
   // 사용량 업데이트
-  public updateUsage(id: string, cost: number): void {
+  public updateUsage(id: string, cost: number): Promise<void> | void {
     const key = this.storage.get(id)
     if (key) {
       key.usage_count += 1
@@ -188,6 +174,12 @@ class APIKeyStorage {
       key.last_used = new Date().toISOString()
       this.storage.set(id, key)
     }
+  }
+
+  public logUsage(usage: any): Promise<void> | void {
+    // Memory storage doesn't keep logs persistently usually, 
+    // but we could just console log it.
+    console.log(`Memory Storage Log: Key ${usage.api_key_id} used ${usage.tokens_used} tokens ($${usage.cost_usd})`)
   }
 
   // 스토리지 상태 조회 (디버깅용)
@@ -208,4 +200,4 @@ class APIKeyStorage {
   }
 }
 
-export const apiKeyStorage = APIKeyStorage.getInstance()
+export const apiKeyStorage = MemoryAPIKeyStorage.getInstance()

@@ -1,4 +1,6 @@
+import Link from 'next/link'
 import RealTimeLog from '@/components/admin/RealTimeLog'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
 export default function SystemMonitoring() {
   return (

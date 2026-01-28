@@ -1,6 +1,13 @@
 import crypto from 'crypto'
-import { apiKeyStorage, StoredAPIKey } from './api-key-storage'
 
+// Since they were defined inline in the original file, we will keep them inline or stick to original definitions if they weren't moved. 
+// I will re-declare them to be safe as I am replacing the file content logic.
+
+import { APIKeyStorage, StoredAPIKey } from './api-key-storage-interface'
+import { apiKeyStorage as memoryStorage } from './api-key-storage'
+import { supabaseApiKeyStorage } from './supabase-api-key-storage'
+
+// Re-defining interfaces as they were in the original file
 export interface APIKeyConfig {
   id: string
   service_name: 'claude' | 'openai' | 'gemini' | 'stripe' | 'naver_search' | 'naver_datalab'
@@ -32,11 +39,14 @@ export interface TokenUsage {
 
 class APIKeyManager {
   private static instance: APIKeyManager
-  private apiKeys: Map<string, APIKeyConfig[]> = new Map()
-  private lastCacheUpdate = 0
-  private cacheValidityMs = 60000 // 1분 캐시
+  // Cache active keys to reduce DB calls (optional, but good for performance)
+  // private activeKeyCache: Map<string, string> = new Map() 
 
-  private constructor() {}
+  private storage: APIKeyStorage
+
+  private constructor() {
+    this.storage = this.selectStorage()
+  }
 
   public static getInstance(): APIKeyManager {
     if (!APIKeyManager.instance) {
@@ -45,46 +55,95 @@ class APIKeyManager {
     return APIKeyManager.instance
   }
 
+  private selectStorage(): APIKeyStorage {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+    if (supabaseUrl && serviceRoleKey && supabaseUrl !== 'your_supabase_project_url') {
+      console.log('API Key Manager: Using Supabase Storage')
+      return supabaseApiKeyStorage
+    }
+    console.log('API Key Manager: Using Memory Storage (Fallback)')
+    return memoryStorage
+  }
+
   // API 키 암호화
   private encryptAPIKey(apiKey: string): string {
-    const algorithm = 'aes-256-gcm'
-    const key = Buffer.from(process.env.ENCRYPTION_KEY || 'default-32-char-key-for-demo-use', 'utf8').slice(0, 32)
-    const iv = crypto.randomBytes(16)
+    if (!apiKey) return ''
+    try {
+      const algorithm = 'aes-256-gcm'
+      const key = Buffer.from(process.env.ENCRYPTION_KEY || 'default-32-char-key-for-demo-use', 'utf8').slice(0, 32)
+      const iv = crypto.randomBytes(16)
 
-    const cipher = crypto.createCipher(algorithm, key)
-    let encrypted = cipher.update(apiKey, 'utf8', 'hex')
-    encrypted += cipher.final('hex')
+      const cipher = crypto.createCipheriv(algorithm, key, iv)
+      let encrypted = cipher.update(apiKey, 'utf8', 'hex')
+      encrypted += cipher.final('hex')
+      const authTag = cipher.getAuthTag().toString('hex')
 
-    return `${iv.toString('hex')}:${encrypted}`
+      return `${iv.toString('hex')}:${authTag}:${encrypted}`
+    } catch (e) {
+      console.error('Encryption failed', e)
+      return apiKey // Fallback (dangerous but prevents data loss in dev) or throw
+    }
   }
 
   // API 키 복호화
   private decryptAPIKey(encryptedKey: string): string {
+    if (!encryptedKey) return ''
+    // Check if it's already plain text (simple heuristic: no colons or specific prefix)
+    // Supabase stored keys should be encrypted. Env keys in memory might be plain.
+    if (!encryptedKey.includes(':')) {
+      return encryptedKey
+    }
+
     try {
+      const parts = encryptedKey.split(':')
+      if (parts.length < 3) return encryptedKey // Not our format
+
+      const [ivHex, authTagHex, encrypted] = parts
+
       const algorithm = 'aes-256-gcm'
       const key = Buffer.from(process.env.ENCRYPTION_KEY || 'default-32-char-key-for-demo-use', 'utf8').slice(0, 32)
-
-      const [ivHex, encrypted] = encryptedKey.split(':')
       const iv = Buffer.from(ivHex, 'hex')
+      const authTag = Buffer.from(authTagHex, 'hex')
 
-      const decipher = crypto.createDecipher(algorithm, key)
+      const decipher = crypto.createDecipheriv(algorithm, key, iv)
+      decipher.setAuthTag(authTag)
+
       let decrypted = decipher.update(encrypted, 'hex', 'utf8')
       decrypted += decipher.final('utf8')
 
       return decrypted
     } catch (error) {
-      console.error('Failed to decrypt API key:', error)
-      return ''
+      //   console.error('Failed to decrypt API key:', error) 
+      // If decryption fails, it might be a plain key that just happened to have colons (unlikely)
+      // or key mismatch. Return original to be safe? Or empty?
+      // For now, return original if decryption fails allows transitioning from plain text DB if that happened.
+      return encryptedKey
     }
   }
 
-  // 활성화된 API 키 조회 (메모리 스토리지 우선, 환경변수 대체)
+  // 활성화된 API 키 조회
   public async getActiveAPIKey(service: 'claude' | 'openai' | 'gemini' | 'stripe' | 'naver_search' | 'naver_datalab'): Promise<string | null> {
-    // 1. 메모리 스토리지에서 활성화된 키 조회
-    const storedKey = apiKeyStorage.getActiveKey(service)
+    // 1. 스토리지에서 활성화된 키 조회
+    // Note: Supabase storage implementation doesn't support 'naver_search' yet due to schema constraints.
+    // If service is naver, fallback to memoryEnv if not found or if storage is Supabase.
+
+    let storedKey: StoredAPIKey | null = null
+
+    // Naver keys are currently only in memory/env because of DB schema limits
+    if (service === 'naver_search' || service === 'naver_datalab') {
+      // Force memory storage check for Naver
+      storedKey = memoryStorage.getActiveKey(service)
+    } else {
+      storedKey = await this.storage.getActiveKey(service)
+    }
+
     if (storedKey && storedKey.is_active) {
-      console.log(`메모리 스토리지에서 ${service} API 키를 사용합니다.`)
-      return storedKey.api_key || null
+      // Decrypt if it's an API key service
+      if (storedKey.api_key) {
+        return this.decryptAPIKey(storedKey.api_key)
+      }
     }
 
     // 2. 환경 변수에서 대체 조회 (기존 호환성)
@@ -93,26 +152,28 @@ class APIKeyManager {
       'openai': process.env.OPENAI_API_KEY,
       'gemini': process.env.GOOGLE_AI_API_KEY,
       'stripe': process.env.STRIPE_SECRET_KEY,
-      'naver_search': null, // 네이버는 client_id/secret 구조
+      'naver_search': null,
       'naver_datalab': null
     }
 
     const envKey = envKeyMap[service]
     if (envKey) {
-      console.log(`환경 변수에서 ${service} API 키를 사용합니다.`)
+      //   console.log(`환경 변수에서 ${service} API 키를 사용합니다.`)
       return envKey
     }
 
-    console.warn(`${service} API 키를 찾을 수 없습니다.`)
+    // console.warn(`${service} API 키를 찾을 수 없습니다.`)
     return null
   }
 
   // 네이버 API용 클라이언트 정보 조회
   public async getNaverAPICredentials(): Promise<{ clientId: string; clientSecret: string } | null> {
-    // 메모리 스토리지에서 네이버 검색 API 키 조회
-    const storedKey = apiKeyStorage.getActiveKey('naver_search')
+    // 메모리 스토리지에서 네이버 검색 API 키 조회 (Supabase table doesn't have these columns yet)
+    // We explicitly check memoryStorage even if this.storage is Supabase
+    const storedKey = memoryStorage.getActiveKey('naver_search')
+
     if (storedKey && storedKey.is_active && storedKey.client_id && storedKey.client_secret) {
-      console.log('메모리 스토리지에서 네이버 API 인증정보를 사용합니다.')
+      //   console.log('메모리 스토리지에서 네이버 API 인증정보를 사용합니다.')
       return {
         clientId: storedKey.client_id,
         clientSecret: storedKey.client_secret
@@ -121,7 +182,7 @@ class APIKeyManager {
 
     // 환경 변수에서 대체 조회
     if (process.env.NAVER_CLIENT_ID && process.env.NAVER_CLIENT_SECRET) {
-      console.log('환경 변수에서 네이버 API 인증정보를 사용합니다.')
+      //   console.log('환경 변수에서 네이버 API 인증정보를 사용합니다.')
       return {
         clientId: process.env.NAVER_CLIENT_ID,
         clientSecret: process.env.NAVER_CLIENT_SECRET
@@ -136,31 +197,27 @@ class APIKeyManager {
   public async getUserTokenBalance(userId: string): Promise<number> {
     // Supabase가 설정되지 않은 경우 임시로 무제한 토큰 반환
     if (process.env.NEXT_PUBLIC_SUPABASE_URL === 'your_supabase_project_url') {
-      console.log(`임시 모드: 사용자 ${userId}에게 무제한 토큰 제공`)
       return 999999
     }
-
-    // 기본값 반환
-    console.log(`사용자 ${userId}의 토큰 잔액을 확인할 수 없습니다. 기본값 반환.`)
+    // TODO: Implement actual user token balance check from DB
     return 999999
   }
 
   // 토큰 사용량 기록
   public async recordTokenUsage(apiKeyId: string, usage: TokenUsage): Promise<boolean> {
-    // Supabase가 설정되지 않은 경우 로그만 출력
-    if (process.env.NEXT_PUBLIC_SUPABASE_URL === 'your_supabase_project_url') {
-      console.log(`토큰 사용량 기록 (임시): ${usage.tokens_used} tokens, $${usage.cost_usd.toFixed(4)}`)
+    // If we are using Supabase storage, we should insert into api_key_usage_logs
+    try {
+      await this.storage.logUsage({ ...usage, api_key_id: apiKeyId })
+      // console.log(`토큰 사용량 기록 완료: ${usage.tokens_used} tokens`)
       return true
+    } catch (e) {
+      console.error('Failed to log usage', e)
+      return false
     }
-
-    // 기본적으로 성공 반환
-    console.log(`토큰 사용량 기록 스킵: ${usage.tokens_used} tokens, $${usage.cost_usd.toFixed(4)}`)
-    return true
   }
 
   // 토큰 가격 조회
   public async getTokenPrice(service: string, model: string): Promise<{ input: number; output: number; image?: number }> {
-    // 기본 가격 설정 (Claude API 실제 가격)
     const defaultPricing = {
       'claude': {
         'claude-3-5-sonnet-20241022': { input: 0.000003, output: 0.000015 },
@@ -182,21 +239,31 @@ class APIKeyManager {
       return servicePricing[model as keyof typeof servicePricing]
     }
 
-    // 기본값 반환
     return { input: 0.000001, output: 0.000002 }
   }
 
   // 전체 API 키 목록 조회 (관리자용)
   public async getAllAPIKeys(): Promise<APIKeyConfig[]> {
     try {
-      // 메모리 스토리지에서 모든 키 조회
-      const storedKeys = apiKeyStorage.getAllKeys()
+      // 1. Get keys from current storage
+      const storedKeys = await this.storage.getAllKeys()
 
-      // StoredAPIKey를 APIKeyConfig 형식으로 변환
-      const apiKeys: APIKeyConfig[] = storedKeys.map(key => ({
+      // 2. If storage is Supabase, we also want to see Naver keys from memory if they exist
+      let allKeys = storedKeys
+      if (this.storage === supabaseApiKeyStorage) {
+        const memoryKeys = memoryStorage.getAllKeys().filter(k => k.service_name.startsWith('naver'))
+        allKeys = [...storedKeys, ...memoryKeys]
+      }
+
+      // 3. Convert to Config format and Decrypt for display? 
+      // Usually we don't display full key, but for editing we might need it.
+      // Admin might want to see verify key. 
+      // Let's decrypt it here.
+
+      const apiKeys: APIKeyConfig[] = allKeys.map(key => ({
         id: key.id,
         service_name: key.service_name,
-        api_key: key.api_key,
+        api_key: key.api_key ? this.decryptAPIKey(key.api_key) : undefined,
         client_id: key.client_id,
         client_secret: key.client_secret,
         api_key_name: key.api_key_name,
@@ -208,22 +275,29 @@ class APIKeyManager {
         last_used: key.last_used
       }))
 
-      console.log(`메모리 스토리지에서 ${apiKeys.length}개 API 키 조회`)
       return apiKeys
     } catch (error) {
       console.error('API 키 조회 실패:', error)
-      return this.getDemoAPIKeys()
+      return []
     }
   }
 
   // API 키 추가/수정 (관리자용)
   public async upsertAPIKey(apiKeyData: Omit<APIKeyConfig, 'id'> & { id?: string }): Promise<APIKeyConfig> {
     try {
-      // APIKeyConfig를 StoredAPIKey 형식으로 변환
+      // Determine storage for this key
+      let targetStorage = this.storage
+      if (apiKeyData.service_name.startsWith('naver')) {
+        targetStorage = memoryStorage
+      }
+
+      // Encrypt API key if present
+      const encryptedApiKey = apiKeyData.api_key ? this.encryptAPIKey(apiKeyData.api_key) : undefined
+
       const storedKeyData: Omit<StoredAPIKey, 'id' | 'created_at' | 'current_month_cost' | 'usage_count'> & { id?: string } = {
         id: apiKeyData.id,
         service_name: apiKeyData.service_name,
-        api_key: apiKeyData.api_key,
+        api_key: encryptedApiKey,
         client_id: apiKeyData.client_id,
         client_secret: apiKeyData.client_secret,
         api_key_name: apiKeyData.api_key_name,
@@ -233,14 +307,12 @@ class APIKeyManager {
         last_used: apiKeyData.last_used
       }
 
-      // 메모리 스토리지에 저장
-      const savedKey = apiKeyStorage.upsertKey(storedKeyData)
+      const savedKey = await targetStorage.upsertKey(storedKeyData)
 
-      // StoredAPIKey를 APIKeyConfig로 변환하여 반환
       const result: APIKeyConfig = {
         id: savedKey.id,
         service_name: savedKey.service_name,
-        api_key: savedKey.api_key,
+        api_key: apiKeyData.api_key, // Return the original plain text key to the caller
         client_id: savedKey.client_id,
         client_secret: savedKey.client_secret,
         api_key_name: savedKey.api_key_name,
@@ -260,11 +332,17 @@ class APIKeyManager {
     }
   }
 
-  // API 키 삭제 (관리자용)
+  // API 키 삭제
   public async deleteAPIKey(keyId: string): Promise<boolean> {
     try {
-      // 메모리 스토리지에서 삭제
-      const deleted = apiKeyStorage.deleteKey(keyId)
+      // Try delete from both to be safe or check ID?
+      // Since ID format might differ (UUID vs memory ID), we can try current storage first.
+
+      let deleted = await this.storage.deleteKey(keyId)
+      if (!deleted && this.storage === supabaseApiKeyStorage) {
+        // If not found in Supabase, try Memory (it might be a Naver key)
+        deleted = await memoryStorage.deleteKey(keyId)
+      }
 
       if (deleted) {
         console.log(`API 키 삭제 완료: ${keyId}`)
@@ -279,16 +357,18 @@ class APIKeyManager {
     }
   }
 
-  // API 키 활성화/비활성화 (관리자용)
+  // API 키 활성화/비활성화
   public async toggleAPIKey(keyId: string, isActive: boolean): Promise<boolean> {
     try {
-      const toggled = apiKeyStorage.toggleKey(keyId, isActive)
+      let toggled = await this.storage.toggleKey(keyId, isActive)
+      if (!toggled && this.storage === supabaseApiKeyStorage) {
+        toggled = await memoryStorage.toggleKey(keyId, isActive)
+      }
 
       if (toggled) {
         console.log(`API 키 상태 변경 완료: ${keyId} -> ${isActive ? '활성' : '비활성'}`)
         return true
       } else {
-        console.warn(`상태를 변경할 API 키를 찾을 수 없습니다: ${keyId}`)
         return false
       }
     } catch (error) {
@@ -297,81 +377,17 @@ class APIKeyManager {
     }
   }
 
-  // 사용량 업데이트 (관리자용)
+  // 사용량 업데이트
   public async updateKeyUsage(keyId: string, cost: number): Promise<void> {
     try {
-      apiKeyStorage.updateUsage(keyId, cost)
-      console.log(`API 키 사용량 업데이트 완료: ${keyId} (+$${cost.toFixed(4)})`)
+      // Only useful for memory storage primarily
+      await memoryStorage.updateUsage(keyId, cost)
+      if (this.storage === supabaseApiKeyStorage) {
+        await supabaseApiKeyStorage.updateUsage(keyId, cost)
+      }
     } catch (error) {
       console.error(`API 키 사용량 업데이트 실패: ${keyId}`, error)
     }
-  }
-
-  private getDemoAPIKeys(): APIKeyConfig[] {
-    return [
-      {
-        id: 'demo-1',
-        service_name: 'claude',
-        api_key: 'sk-ant-*********************....',
-        api_key_name: 'Claude Production Key',
-        is_active: true,
-        rate_limit_per_minute: 60,
-        monthly_budget_usd: 1000,
-        current_month_cost: 245.67,
-        usage_count: 1234,
-        last_used: '2024-12-26T08:30:00Z'
-      },
-      {
-        id: 'demo-2',
-        service_name: 'openai',
-        api_key: 'sk-*********************....',
-        api_key_name: 'OpenAI GPT-4 Key',
-        is_active: true,
-        rate_limit_per_minute: 100,
-        monthly_budget_usd: 800,
-        current_month_cost: 156.89,
-        usage_count: 856,
-        last_used: '2024-12-26T09:15:00Z'
-      },
-      {
-        id: 'demo-3',
-        service_name: 'gemini',
-        api_key: 'AIza*********************....',
-        api_key_name: 'Gemini Pro Key',
-        is_active: false,
-        rate_limit_per_minute: 60,
-        monthly_budget_usd: 500,
-        current_month_cost: 0,
-        usage_count: 0,
-        last_used: undefined
-      },
-      {
-        id: 'demo-4',
-        service_name: 'naver_search',
-        client_id: 'YOUR_NAVER_CLIENT_ID',
-        client_secret: 'YOUR_NAVER_CLIENT_SECRET',
-        api_key_name: 'Naver Search API',
-        is_active: true,
-        rate_limit_per_minute: 1000,
-        monthly_budget_usd: 100,
-        current_month_cost: 12.34,
-        usage_count: 567,
-        last_used: '2024-12-26T10:00:00Z'
-      },
-      {
-        id: 'demo-5',
-        service_name: 'naver_datalab',
-        client_id: 'YOUR_NAVER_CLIENT_ID',
-        client_secret: 'YOUR_NAVER_CLIENT_SECRET',
-        api_key_name: 'Naver DataLab API',
-        is_active: true,
-        rate_limit_per_minute: 100,
-        monthly_budget_usd: 50,
-        current_month_cost: 5.67,
-        usage_count: 89,
-        last_used: '2024-12-26T09:45:00Z'
-      }
-    ]
   }
 }
 

@@ -1,6 +1,7 @@
 import { BaseAgent } from '@/lib/agents/base-agent'
 import { AgentType, AgentResult, SharedContext } from '@/types/agents'
 import { ContentWritingOutput } from './content-writing-agent'
+import { aiServiceRouter } from '@/lib/services/ai-service-router'
 
 export interface AnswerOptimizationInput {
   contentData: ContentWritingOutput
@@ -115,7 +116,7 @@ export class AnswerOptimizationAgent extends BaseAgent {
   }
 
   private getCommonQuestions(specialization: string, topic: string) {
-    const questions: Record<string, Array<{question: string, category: string, keywords: string[]}>> = {
+    const questions: Record<string, Array<{ question: string, category: string, keywords: string[] }>> = {
       'medical': [
         {
           question: `${topic}은 무엇인가요?`,
@@ -216,7 +217,7 @@ export class AnswerOptimizationAgent extends BaseAgent {
   }
 
   private getProfessionalQuestions(specialization: string) {
-    const questions: Record<string, Array<{question: string, category: string, keywords: string[]}>> = {
+    const questions: Record<string, Array<{ question: string, category: string, keywords: string[] }>> = {
       'medical': [
         {
           question: '언제 전문의를 찾아야 하나요?',
@@ -271,7 +272,7 @@ export class AnswerOptimizationAgent extends BaseAgent {
   }
 
   private getProcessQuestions(specialization: string) {
-    const questions: Record<string, Array<{question: string, category: string, keywords: string[]}>> = {
+    const questions: Record<string, Array<{ question: string, category: string, keywords: string[] }>> = {
       'medical': [
         {
           question: '진료 예약은 어떻게 하나요?',
@@ -399,7 +400,7 @@ ${professionalTone} 이 질문은 ${targetAudience}께서 자주 궁금해하시
   }
 
   private createDefinitionBoxes(topic: string, specialization: string) {
-    const definitions: Array<{term: string, definition: string, context: string}> = []
+    const definitions: Array<{ term: string, definition: string, context: string }> = []
 
     // 주요 용어 정의
     definitions.push({
@@ -436,7 +437,7 @@ ${professionalTone} 이 질문은 ${targetAudience}께서 자주 궁금해하시
   }
 
   private optimizeLists(contentData: any, specialization: string) {
-    const lists: Array<{title: string, items: string[], type: 'numbered' | 'bulleted'}> = []
+    const lists: Array<{ title: string, items: string[], type: 'numbered' | 'bulleted' }> = []
 
     const mainSections = contentData?.content?.mainSections || [
       { title: '기본 개념', keyPoints: ['핵심 내용'] },

@@ -51,6 +51,7 @@ export interface SharedContext {
   contentGoal: string
   brandTone: string
   platform: string
+  userId?: string // Optional for now to avoid breaking existing calls
 }
 
 // 워크플로우 단계

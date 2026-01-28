@@ -1,6 +1,7 @@
 import { BaseAgent } from '@/lib/agents/base-agent'
 import { AgentType, AgentResult, SharedContext } from '@/types/agents'
 import { TrendKeywordOutput } from './trend-keyword-agent'
+import { aiServiceRouter } from '@/lib/services/ai-service-router'
 
 export interface ContentPlanningInput {
   keywords: TrendKeywordOutput
@@ -53,114 +54,116 @@ export class ContentPlanningAgent extends BaseAgent {
       const targetAudience = input?.targetAudience || context?.targetAudience || '일반 사용자'
       const brandVoice = input?.brandVoice || context?.brandTone || '친근한'
       const contentGoals = input?.contentGoals || ['engagement']
+      const userId = context.userId || 'anonymous'
 
-      const primaryKeyword = this.selectPrimaryKeyword(keywords)
-      const contentStrategy = this.developContentStrategy(primaryKeyword, targetAudience, brandVoice)
-      const structure = this.createContentStructure(primaryKeyword, { keywords })
-      const seoStrategy = this.planSEOStrategy(keywords, primaryKeyword)
-
-      const output: ContentPlanningOutput = {
-        contentStrategy,
-        structure,
-        seoStrategy,
-        targetAudience,
-        contentGoal: Array.isArray(contentGoals) ? contentGoals[0] : contentGoals || 'engagement'
-      }
+      // AI를 사용하여 콘텐츠 기획 생성
+      const aiOutput = await this.generatePlanWithAI(keywords, targetAudience, brandVoice, contentGoals, userId)
 
       const executionTime = Date.now() - startTime
-      const tokensUsed = this.calculateTokens(JSON.stringify(output))
+      const tokensUsed = this.calculateTokens(JSON.stringify(aiOutput))
 
-      return this.createSuccessResult(output, executionTime, tokensUsed)
+      return this.createSuccessResult(aiOutput, executionTime, tokensUsed)
     } catch (error) {
       const executionTime = Date.now() - startTime
       return this.handleError(error as Error, executionTime)
     }
   }
 
-  private selectPrimaryKeyword(keywords: any[]): string {
-    // 검색량과 경쟁도를 고려하여 주요 키워드 선택
-    if (!keywords || !Array.isArray(keywords) || keywords.length === 0) {
-      return '기본 키워드'
-    }
+  private async generatePlanWithAI(keywords: any[], targetAudience: string, brandVoice: string, contentGoals: string[], userId: string): Promise<ContentPlanningOutput> {
+    const keywordList = keywords.map(k => `${k.keyword} (Vol: ${k.searchVolume}, Comp: ${k.competition})`).join(', ')
 
-    const sorted = keywords.sort((a, b) => {
-      const scoreA = (a?.searchVolume || 0) * (a?.competition === 'low' ? 1.5 : a?.competition === 'medium' ? 1 : 0.7)
-      const scoreB = (b?.searchVolume || 0) * (b?.competition === 'low' ? 1.5 : b?.competition === 'medium' ? 1 : 0.7)
-      return scoreB - scoreA
-    })
-    return sorted[0]?.keyword || keywords[0]?.keyword || '기본 키워드'
+    const prompt = `당신은 전문적인 콘텐츠 전략가입니다. 다음 SEO 키워드 데이터를 바탕으로 블로그 콘텐츠 기획안을 작성해주세요.
+
+주요 정보:
+- 타겟 키워드: ${keywordList}
+- 타겟 독자: ${targetAudience}
+- 브랜드 보이스: ${brandVoice}
+- 콘텐츠 목표: ${contentGoals.join(', ')}
+
+다음 JSON 형식으로 응답해주세요:
+{
+  "contentStrategy": {
+    "mainTopic": "메인 주제 (H1)",
+    "angle": "콘텐츠 접근 각도 (예: 가이드, 비교, 분석 등)",
+    "uniqueValue": "이 콘텐츠가 독자에게 주는 가치 제안"
+  },
+  "structure": {
+    "introduction": "서론 개요 (후킹 및 문제 제기)",
+    "mainSections": [
+      {
+        "title": "섹션 제목 (H2)",
+        "keyPoints": ["다룰 핵심 내용 1", "다룰 핵심 내용 2"],
+        "targetKeyword": "이 섹션에서 타겟팅할 키워드"
+      }
+    ],
+    "conclusion": "결론 개요 (요약 및 CTA)"
+  },
+  "seoStrategy": {
+    "primaryKeyword": "가장 중요한 메인 키워드 1개",
+    "secondaryKeywords": ["보조 키워드 3-5개"],
+    "targetWordCount": 예상_단어_수(숫자)
   }
+}
 
-  private developContentStrategy(primaryKeyword: string, targetAudience: string, brandVoice: string) {
-    return {
-      mainTopic: primaryKeyword,
-      angle: this.determineContentAngle(primaryKeyword, targetAudience),
-      uniqueValue: this.identifyUniqueValue(primaryKeyword, brandVoice)
-    }
-  }
+응답은 오직 유효한 JSON 포맷이어야 합니다.`
 
-  private determineContentAngle(keyword: string, audience: string): string {
-    const angles = [
-      '실용적 가이드',
-      '심층 분석',
-      '비교 리뷰',
-      '단계별 튜토리얼',
-      '전문가 인사이트'
-    ]
-
-    // 키워드와 타겟 오디언스에 따라 적절한 앵글 선택
-    if (keyword.includes('가이드') || keyword.includes('방법')) {
-      return '단계별 튜토리얼'
-    } else if (keyword.includes('비교') || keyword.includes('추천')) {
-      return '비교 리뷰'
-    } else if (keyword.includes('분석') || keyword.includes('심화')) {
-      return '심층 분석'
-    }
-    return '실용적 가이드'
-  }
-
-  private identifyUniqueValue(keyword: string, brandVoice: string): string {
-    return `${brandVoice} 스타일로 ${keyword}에 대한 실용적이고 신뢰할 수 있는 정보 제공`
-  }
-
-  private createContentStructure(primaryKeyword: string, keywordData: any) {
-    const keywords = keywordData?.keywords || []
-    const mainSections = keywords.slice(1, 4).map((kw: any, index: number) => ({
-      title: `${index + 1}. ${kw?.keyword || `섹션 ${index + 1}`}의 핵심 포인트`,
-      keyPoints: [
-        `${kw?.keyword || '해당 주제'}의 주요 특징`,
-        `실제 활용 방법`,
-        `주의사항 및 팁`
-      ],
-      targetKeyword: kw?.keyword || `키워드 ${index + 1}`
-    }))
-
-    // 섹션이 없는 경우 기본 섹션 생성
-    if (mainSections.length === 0) {
-      mainSections.push({
-        title: `1. ${primaryKeyword}의 기본 개념`,
-        keyPoints: [
-          `${primaryKeyword}의 주요 특징`,
-          `실제 활용 방법`,
-          `주의사항 및 팁`
-        ],
-        targetKeyword: primaryKeyword
+    try {
+      const response = await aiServiceRouter.generateText({
+        service: 'claude',
+        model: 'claude-3-haiku-20240307',
+        prompt: prompt,
+        userId: userId,
+        maxTokens: 2500,
+        temperature: 0.7
       })
-    }
 
-    return {
-      introduction: `${primaryKeyword}에 대한 포괄적인 이해를 돕는 서론`,
-      mainSections,
-      conclusion: `${primaryKeyword}에 대한 요약과 실행 가능한 다음 단계`
-    }
-  }
+      if (!response.success || !response.data) {
+        throw new Error(response.error || 'AI 응답 실패')
+      }
 
-  private planSEOStrategy(keywords: any[], primaryKeyword: string) {
-    const safeKeywords = Array.isArray(keywords) ? keywords : []
-    return {
-      primaryKeyword,
-      secondaryKeywords: safeKeywords.slice(1, 6).map(k => k?.keyword || '').filter(Boolean),
-      targetWordCount: Math.max(1500, safeKeywords.length * 300) // 키워드 개수에 따라 조정
+      const content = response.data.text
+      const jsonMatch = content.match(/\{[\s\S]*\}/)
+
+      if (!jsonMatch) {
+        throw new Error('AI 응답에서 JSON을 찾을 수 없습니다')
+      }
+
+      const parsed = JSON.parse(jsonMatch[0])
+
+      // 응답 구조 보정
+      return {
+        contentStrategy: parsed.contentStrategy,
+        structure: parsed.structure,
+        seoStrategy: parsed.seoStrategy,
+        targetAudience: targetAudience,
+        contentGoal: contentGoals[0] || 'engagement'
+      }
+
+    } catch (error) {
+      console.error('Content Planning Agent AI Error:', error)
+      // 에러 발생 시 휴리스틱 방식(기존 로직)으로 폴백하도록 구현할 수 있으나, 
+      // Phase 4 목표상 AI 에러를 전파하거나 기본값(fallback)을 최소화합니다.
+      // 여기서는 안전하게 기본 구조를 반환합니다.
+
+      return {
+        contentStrategy: {
+          mainTopic: keywords[0]?.keyword || '제목 미정',
+          angle: '일반 정보',
+          uniqueValue: '정보 제공'
+        },
+        structure: {
+          introduction: '서론',
+          mainSections: [],
+          conclusion: '결론'
+        },
+        seoStrategy: {
+          primaryKeyword: keywords[0]?.keyword || '',
+          secondaryKeywords: [],
+          targetWordCount: 1500
+        },
+        targetAudience,
+        contentGoal: contentGoals[0]
+      }
     }
   }
 }

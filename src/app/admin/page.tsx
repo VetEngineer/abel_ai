@@ -11,6 +11,7 @@ import APIKeyManagement from '@/components/admin/APIKeyManagement'
 import UserManagement from '@/components/admin/UserManagement'
 import SystemMonitoring from '@/components/admin/SystemMonitoring'
 import AdminAccountManagement from '@/components/admin/AdminAccountManagement'
+import AdminSecuritySettings from '@/components/admin/AdminSecuritySettings'
 import { adminStatsService, type AdminStats } from '@/lib/services/admin-stats-service'
 
 export default function AdminPanel() {
@@ -18,7 +19,7 @@ export default function AdminPanel() {
   const [stats, setStats] = useState<AdminStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [authenticated, setAuthenticated] = useState(false)
-  const [adminUser, setAdminUser] = useState<{username: string, role: string} | null>(null)
+  const [adminUser, setAdminUser] = useState<{ username: string, role: string } | null>(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -138,6 +139,7 @@ export default function AdminPanel() {
             <TabsTrigger value="admin-accounts">관리자 계정</TabsTrigger>
             <TabsTrigger value="users">사용자 관리</TabsTrigger>
             <TabsTrigger value="monitoring">시스템 모니터링</TabsTrigger>
+            <TabsTrigger value="security">보안</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
@@ -215,64 +217,64 @@ export default function AdminPanel() {
               </>
             )}
 
-                <div className="grid gap-6 md:grid-cols-2">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>최근 활동</CardTitle>
-                      <CardDescription>시스템의 최근 활동 내역</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        {stats?.recentActivities && stats.recentActivities.length > 0 ? (
-                          stats.recentActivities.map((activity, index) => (
-                            <div key={index} className="flex items-center justify-between">
-                              <span className="text-sm">{activity.description}</span>
-                              <Badge variant={
-                                activity.type === 'warning' ? 'destructive' :
-                                activity.type === 'success' ? 'secondary' : 'outline'
-                              }>
-                                {activity.timeAgo}
-                              </Badge>
-                            </div>
-                          ))
-                        ) : (
-                          <div className="text-center py-4 text-muted-foreground">
-                            최근 활동 내역이 없습니다.
-                          </div>
-                        )}
+            <div className="grid gap-6 md:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle>최근 활동</CardTitle>
+                  <CardDescription>시스템의 최근 활동 내역</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {stats?.recentActivities && stats.recentActivities.length > 0 ? (
+                      stats.recentActivities.map((activity, index) => (
+                        <div key={index} className="flex items-center justify-between">
+                          <span className="text-sm">{activity.description}</span>
+                          <Badge variant={
+                            activity.type === 'warning' ? 'destructive' :
+                              activity.type === 'success' ? 'secondary' : 'outline'
+                          }>
+                            {activity.timeAgo}
+                          </Badge>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-4 text-muted-foreground">
+                        최근 활동 내역이 없습니다.
                       </div>
-                    </CardContent>
-                  </Card>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
 
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>시스템 상태</CardTitle>
-                      <CardDescription>현재 시스템 상태 확인</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        {stats?.systemStatus && stats.systemStatus.length > 0 ? (
-                          stats.systemStatus.map((system, index) => (
-                            <div key={index} className="flex items-center justify-between">
-                              <span className="text-sm">{system.service}</span>
-                              <Badge variant={
-                                system.status === 'normal' ? 'secondary' :
-                                system.status === 'warning' ? 'destructive' : 'outline'
-                              }>
-                                {system.status === 'normal' ? '정상' :
-                                 system.status === 'warning' ? '경고' : '점검 중'}
-                              </Badge>
-                            </div>
-                          ))
-                        ) : (
-                          <div className="text-center py-4 text-muted-foreground">
-                            시스템 상태 정보를 불러올 수 없습니다.
-                          </div>
-                        )}
+              <Card>
+                <CardHeader>
+                  <CardTitle>시스템 상태</CardTitle>
+                  <CardDescription>현재 시스템 상태 확인</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {stats?.systemStatus && stats.systemStatus.length > 0 ? (
+                      stats.systemStatus.map((system, index) => (
+                        <div key={index} className="flex items-center justify-between">
+                          <span className="text-sm">{system.service}</span>
+                          <Badge variant={
+                            system.status === 'normal' ? 'secondary' :
+                              system.status === 'warning' ? 'destructive' : 'outline'
+                          }>
+                            {system.status === 'normal' ? '정상' :
+                              system.status === 'warning' ? '경고' : '점검 중'}
+                          </Badge>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-4 text-muted-foreground">
+                        시스템 상태 정보를 불러올 수 없습니다.
                       </div>
-                    </CardContent>
-                  </Card>
-                </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           <TabsContent value="api-keys">
@@ -287,8 +289,13 @@ export default function AdminPanel() {
             <UserManagement />
           </TabsContent>
 
+
           <TabsContent value="monitoring">
             <SystemMonitoring />
+          </TabsContent>
+
+          <TabsContent value="security">
+            <AdminSecuritySettings user={adminUser} onUpdate={verifyAuth} />
           </TabsContent>
         </Tabs>
       </div>

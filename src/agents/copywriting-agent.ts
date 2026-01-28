@@ -1,6 +1,7 @@
 import { BaseAgent } from '@/lib/agents/base-agent'
 import { AgentType, AgentResult, SharedContext } from '@/types/agents'
 import { SEOOptimizationOutput } from './seo-optimization-agent'
+import { aiServiceRouter } from '@/lib/services/ai-service-router'
 
 export interface CopywritingInput {
   seoData: SEOOptimizationOutput
@@ -62,28 +63,14 @@ export class CopywritingAgent extends BaseAgent {
       const brandVoice = input?.brandVoice || context?.brandTone || '전문적인'
       const targetAudience = input?.targetAudience || context?.targetAudience || '일반 사용자'
       const contentGoals = input?.contentGoals || context?.contentGoal || 'engagement'
+      const userId = context.userId || 'anonymous'
 
-      const normalizedInput = {
-        seoData,
-        specialization,
-        brandVoice,
-        targetAudience,
-        contentGoals
-      }
+      // AI를 사용하여 카피라이팅 생성
+      const aiOutput = await this.generateCopyWithAI({
+        seoData, specialization, brandVoice, targetAudience, contentGoals
+      }, userId)
 
-      const headlines = this.createHeadlines(normalizedInput)
-      const introHook = this.craftIntroHook(normalizedInput)
-      const callToActions = this.generateCallToActions(normalizedInput)
-      const testimonialFramework = this.buildTestimonialFramework(normalizedInput)
-      const persuasionElements = this.createPersuasionElements(normalizedInput)
-
-      const output: CopywritingOutput = {
-        headlines,
-        introHook,
-        callToActions,
-        testimonialFramework,
-        persuasionElements
-      }
+      const output: CopywritingOutput = aiOutput
 
       const executionTime = Date.now() - startTime
       const tokensUsed = this.calculateTokens(JSON.stringify(output))
@@ -95,221 +82,110 @@ export class CopywritingAgent extends BaseAgent {
     }
   }
 
-  private createHeadlines(input: any) {
-    const { seoData, specialization, targetAudience, contentGoals } = input
-    const primaryTopic = seoData?.headings?.h1 || seoData?.metaData?.title || '전문 가이드'
+  private async generateCopyWithAI(input: any, userId: string): Promise<CopywritingOutput> {
+    const { seoData, specialization, brandVoice, targetAudience, contentGoals } = input
+    const primaryTopic = seoData?.headings?.h1 || '전문 주제'
+    const keywords = (seoData?.metaData?.keywords || []).slice(0, 5).join(', ')
 
-    const specializationCredential = this.getSpecializationCredential(specialization)
-    const urgencyWord = this.getUrgencyWord(contentGoals)
-    const benefitWord = this.getBenefitWord(specialization)
+    const prompt = `전문 카피라이터로서 다음 콘텐츠를 위한 세일즈 카피와 헤드라인을 작성해주세요.
 
-    const main = `${specializationCredential}가 알려주는 ${primaryTopic} ${urgencyWord} 가이드`
+컨텍스트:
+- 주제: ${primaryTopic}
+- 키워드: ${keywords}
+- 타겟 독자: ${targetAudience}
+- 브랜드 보이스: ${brandVoice}
+- 전문 분야: ${specialization}
+- 목표: ${contentGoals}
 
-    const alternative = [
-      `${targetAudience}를 위한 ${primaryTopic} 완벽 해결법`,
-      `${primaryTopic}, 이제 ${benefitWord}하게 해결하세요`,
-      `${specializationCredential} 검증된 ${primaryTopic} 노하우`,
-      `${primaryTopic} 실무 적용을 위한 단계별 가이드`,
-      `${targetAudience}가 반드시 알아야 할 ${primaryTopic}`
-    ]
+다음 JSON 형식으로 응답해주세요. 독자의 호기심을 자극하고 행동을 유도할 수 있는 매력적인 문구를 작성하세요.
+testimonialFramework는 가상의 고객 후기를 포함해야 합니다.
 
-    const h2Array = seoData?.headings?.h2 || ['주요 내용', '핵심 포인트', '실무 적용']
-    const subHeadlines = h2Array.map((h2: string) =>
-      this.optimizeSubHeadline(h2, specialization)
-    )
-
-    return { main, alternative, subHeadlines }
+{
+  "headlines": {
+    "main": "메인 헤드라인 (30자 내외, 강력한 훅)",
+    "alternative": ["대안 헤드라인 1", "대안 헤드라인 2", "대안 헤드라인 3"],
+    "subHeadlines": ["소제목 아이디어 1", "소제목 아이디어 2"]
+  },
+  "introHook": {
+    "opening": "독자의 공감을 이끌어내는 오프닝 문구",
+    "problemStatement": "독자가 겪고 있을 문제점 명시",
+    "credibilityStatement": "전문가로서의 신뢰성 입증 문구",
+    "previewStatement": "이 글에서 얻을 수 있는 가치 예고"
+  },
+  "callToActions": {
+    "primary": "메인 행동 유도 (예: 상담 신청)",
+    "secondary": ["보조 행동 유도 1", "보조 행동 유도 2"],
+    "consultation": "상담 권유 문구",
+    "newsletter": "뉴스레터 구독 권유 문구"
+  },
+  "testimonialFramework": {
+    "suggestedQuotes": ["가상 추천사 1", "가상 추천사 2"],
+    "clientTypes": ["예상 고객 유형 1", "예상 고객 유형 2"],
+    "credibilityElements": ["신뢰도 요소 1", "요소 2"]
+  },
+  "persuasionElements": {
+    "urgencyTriggers": ["긴급성 유발 문구 1", "문구 2"],
+    "authoritySignals": ["권위 입증 요소 1", "요소 2"],
+    "socialProof": ["사회적 증거 문구 1", "요소 2"],
+    "benefitStatements": ["핵심 이점 1", "이점 2"]
   }
+}
 
-  private getSpecializationCredential(specialization: string): string {
-    const credentials: Record<string, string> = {
-      'medical': '의료진',
-      'legal': '변호사',
-      'tax': '세무사',
-      'marketing': '마케팅 전문가',
-      'consulting': '컨설턴트',
-      'finance': '금융 전문가',
-      'education': '교육 전문가',
-      'other': '전문가'
+응답은 오직 유효한 JSON 포맷이어야 합니다.`
+
+    try {
+      const response = await aiServiceRouter.generateText({
+        service: 'claude',
+        model: 'claude-3-haiku-20240307',
+        prompt: prompt,
+        userId: userId,
+        maxTokens: 2500,
+        temperature: 0.7
+      })
+
+      if (!response.success || !response.data) {
+        throw new Error(response.error || 'AI 응답 실패')
+      }
+
+      const content = response.data.text
+      const jsonMatch = content.match(/\{[\s\S]*\}/)
+
+      if (!jsonMatch) {
+        throw new Error('AI 응답에서 JSON을 찾을 수 없습니다')
+      }
+
+      return JSON.parse(jsonMatch[0]) as CopywritingOutput
+
+    } catch (error) {
+      console.error('Copywriting Agent AI Error:', error)
+      // Fallback to manual heuristic if AI fails
+      return this.getFallbackCopy(input)
     }
-    return credentials[specialization] || '전문가'
   }
 
-  private getUrgencyWord(contentGoals: string): string {
-    if (contentGoals.includes('신규')) return '필수'
-    if (contentGoals.includes('교육')) return '핵심'
-    if (contentGoals.includes('홍보')) return '완벽'
-    if (contentGoals.includes('유치')) return '즉시'
-    return '실무'
-  }
-
-  private getBenefitWord(specialization: string): string {
-    const benefits: Record<string, string> = {
-      'medical': '안전',
-      'legal': '확실',
-      'tax': '효과적',
-      'marketing': '성공적',
-      'consulting': '전략적',
-      'finance': '안정적',
-      'education': '체계적',
-      'other': '효율적'
-    }
-    return benefits[specialization] || '효율적'
-  }
-
-  private optimizeSubHeadline(h2: string, specialization: string): string {
-    const actionWords = ['확인하세요', '주의하세요', '활용하세요', '적용하세요', '검토하세요']
-    const randomAction = actionWords[Math.floor(Math.random() * actionWords.length)]
-
-    if (h2.includes('.')) {
-      return h2.replace('.', `,`) + ` ${randomAction}`
-    }
-    return `${h2}을 ${randomAction}`
-  }
-
-  private craftIntroHook(input: any) {
-    const { targetAudience, specialization, seoData } = input
-    const mainTopic = seoData?.headings?.h1 || seoData?.metaData?.title || '전문 서비스'
-
-    const opening = `${targetAudience}께서 ${mainTopic}에 대해 고민하고 계신가요?`
-
-    const problemStatement = `많은 ${targetAudience}들이 ${mainTopic}에 대해 정확한 정보를 찾지 못해 어려움을 겪고 있습니다. 인터넷상의 부정확한 정보나 일반적인 조언으로는 실제 상황에 적용하기 어려운 것이 현실입니다.`
-
-    const credential = this.getSpecializationCredential(specialization)
-    const credibilityStatement = `${credential}로서 수년간의 실무 경험을 바탕으로, ${targetAudience}가 실제로 적용할 수 있는 검증된 방법들을 정리했습니다.`
-
-    const previewStatement = `이 가이드에서는 ${mainTopic}의 핵심 포인트부터 실무 적용 방법까지, 단계별로 상세하게 설명드리겠습니다.`
-
+  private getFallbackCopy(input: any): CopywritingOutput {
+    const { seoData, specialization, targetAudience } = input
+    // Minimal fallback
     return {
-      opening,
-      problemStatement,
-      credibilityStatement,
-      previewStatement
+      headlines: {
+        main: `${specialization} 전문가가 알려주는 ${seoData?.headings?.h1 || '가이드'}`,
+        alternative: [],
+        subHeadlines: []
+      },
+      introHook: {
+        opening: `${targetAudience} 여러분 안녕하세요.`,
+        problemStatement: '문제 해결이 필요하신가요?',
+        credibilityStatement: '저희가 도와드립니다.',
+        previewStatement: '이 글을 통해 해결책을 알아보세요.'
+      },
+      callToActions: {
+        primary: '지금 상담하기',
+        secondary: [],
+        consultation: '문의하기',
+        newsletter: '구독하기'
+      },
+      testimonialFramework: { suggestedQuotes: [], clientTypes: [], credibilityElements: [] },
+      persuasionElements: { urgencyTriggers: [], authoritySignals: [], socialProof: [], benefitStatements: [] }
     }
-  }
-
-  private generateCallToActions(input: any) {
-    const { specialization, targetAudience } = input
-    const credential = this.getSpecializationCredential(specialization)
-
-    const primary = `${credential}와 직접 상담받기`
-
-    const secondary = [
-      '무료 체크리스트 다운로드',
-      '관련 서비스 자세히 보기',
-      '성공 사례 확인하기',
-      '추가 가이드 읽어보기'
-    ]
-
-    const consultation = `${targetAudience} 맞춤 상담 신청하기`
-
-    const newsletter = `${specialization} 전문 정보 뉴스레터 구독`
-
-    return {
-      primary,
-      secondary,
-      consultation,
-      newsletter
-    }
-  }
-
-  private buildTestimonialFramework(input: any) {
-    const { specialization, targetAudience } = input
-
-    const suggestedQuotes = [
-      `"정말 실무에 바로 적용할 수 있는 내용이었습니다."`,
-      `"다른 곳에서 찾을 수 없는 전문적인 정보였어요."`,
-      `"복잡했던 내용을 이해하기 쉽게 설명해주셨습니다."`,
-      `"시행착오를 줄일 수 있어서 정말 도움이 되었습니다."`,
-      `"전문가의 노하우를 이렇게 공유해주셔서 감사합니다."`
-    ]
-
-    const clientTypes = [
-      `${targetAudience}`,
-      `${specialization} 분야 종사자`,
-      '서비스 이용 고객',
-      '온라인 상담 이용자'
-    ]
-
-    const credibilityElements = [
-      '실제 사례 기반',
-      '전문가 검증 완료',
-      '업계 표준 준수',
-      '지속적인 업데이트'
-    ]
-
-    return {
-      suggestedQuotes,
-      clientTypes,
-      credibilityElements
-    }
-  }
-
-  private createPersuasionElements(input: any) {
-    const { specialization, targetAudience, contentGoals } = input
-
-    const urgencyTriggers = [
-      '지금 바로 확인하세요',
-      '놓치면 안 되는 중요한 정보',
-      '시간이 지날수록 더 복잡해집니다',
-      '조기 대응이 핵심입니다'
-    ]
-
-    const credential = this.getSpecializationCredential(specialization)
-    const authoritySignals = [
-      `${credential} 실무 경험 기반`,
-      '업계 전문 지식 보유',
-      '검증된 방법론 적용',
-      '지속적인 연구 및 학습'
-    ]
-
-    const socialProof = [
-      `많은 ${targetAudience}들이 선택`,
-      '높은 만족도 달성',
-      '성공적인 결과 입증',
-      '업계 인정받은 전문성'
-    ]
-
-    const benefitStatements = this.generateBenefitStatements(specialization, contentGoals)
-
-    return {
-      urgencyTriggers,
-      authoritySignals,
-      socialProof,
-      benefitStatements
-    }
-  }
-
-  private generateBenefitStatements(specialization: string, contentGoals: string): string[] {
-    const baseStatements = [
-      '시간과 비용을 절약할 수 있습니다',
-      '정확한 정보로 안심할 수 있습니다',
-      '실무에 바로 적용 가능합니다',
-      '전문가 수준의 지식을 얻을 수 있습니다'
-    ]
-
-    const specializedStatements: Record<string, string[]> = {
-      'medical': [
-        '환자 안전을 보장할 수 있습니다',
-        '의료진 신뢰도를 높일 수 있습니다'
-      ],
-      'legal': [
-        '법적 리스크를 최소화할 수 있습니다',
-        '확실한 법적 근거를 확보할 수 있습니다'
-      ],
-      'tax': [
-        '세무 부담을 줄일 수 있습니다',
-        '세무 조사에 대비할 수 있습니다'
-      ],
-      'marketing': [
-        '마케팅 ROI를 향상시킬 수 있습니다',
-        '고객 유치 효과를 극대화할 수 있습니다'
-      ]
-    }
-
-    return [
-      ...baseStatements,
-      ...(specializedStatements[specialization] || [])
-    ]
   }
 }

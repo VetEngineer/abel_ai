@@ -2,6 +2,7 @@ import { BaseAgent } from '@/lib/agents/base-agent'
 import { AgentType, AgentResult, SharedContext } from '@/types/agents'
 import { apiKeyManager } from '@/lib/services/api-key-manager'
 import { NaverAPIService } from '@/lib/services/naver-api-service'
+import { aiServiceRouter } from '@/lib/services/ai-service-router'
 
 export interface TrendKeywordInput {
   topic: string
@@ -36,7 +37,7 @@ export class TrendKeywordAgent extends BaseAgent {
 
     try {
       // 네이버 검색 API 호출 (실제 구현에서는 API 키 필요)
-      const keywords = await this.fetchTrendingKeywords(input.topic, input.industry)
+      const keywords = await this.fetchTrendingKeywords(input.topic, input.industry, context.userId)
       const relatedTopics = await this.findRelatedTopics(input.topic)
 
       const output: TrendKeywordOutput = {
@@ -55,7 +56,7 @@ export class TrendKeywordAgent extends BaseAgent {
     }
   }
 
-  private async fetchTrendingKeywords(topic: string, industry: string) {
+  private async fetchTrendingKeywords(topic: string, industry: string, userId: string = 'anonymous') {
     try {
       // 1. 네이버 API를 사용한 실제 키워드 분석
       const naverResults = await this.analyzeKeywordsWithNaver(topic, industry)
@@ -64,13 +65,10 @@ export class TrendKeywordAgent extends BaseAgent {
       }
 
       // 2. 네이버 API 실패 시 Claude AI 키워드 생성
-      const claudeApiKey = await apiKeyManager.getActiveAPIKey('claude')
-      if (claudeApiKey) {
-        console.log('네이버 API 실패, Claude AI로 키워드 생성 시도')
-        return await this.generateKeywordsWithAI(topic, industry, claudeApiKey)
-      }
+      // aiServiceRouter가 API 키 관리 및 로깅을 처리함
+      console.log('네이버 API 실패, Claude AI로 키워드 생성 시도')
+      return await this.generateKeywordsWithAI(topic, industry, userId)
 
-      console.warn('모든 API 키가 설정되지 않음. 목업 데이터 사용.')
     } catch (error) {
       console.error('키워드 분석 오류:', error)
     }
@@ -79,6 +77,58 @@ export class TrendKeywordAgent extends BaseAgent {
     return this.getDefaultKeywords(topic, industry)
   }
 
+  // ... skip analyzeKeywordsWithNaver ...
+
+  private async generateKeywordsWithAI(topic: string, industry: string, userId: string) {
+    const prompt = `다음 주제에 대한 효과적인 SEO 키워드 5개를 생성해주세요:
+
+주제: ${topic}
+산업: ${industry}
+
+각 키워드에 대해 다음 정보를 JSON 배열 형식으로 제공해주세요:
+- keyword: 키워드 내용
+- searchVolume: 예상 월간 검색량 (100-10000 범위의 숫자)
+- competition: 경쟁도 ("low", "medium", "high" 중 하나)
+- trend: 트렌드 ("rising", "stable", "declining" 중 하나)
+
+응답은 반드시 유효한 JSON 배열 형태로만 해주세요.`
+
+    try {
+      const response = await aiServiceRouter.generateText({
+        service: 'claude',
+        model: 'claude-3-haiku-20240307',
+        prompt: prompt,
+        userId: userId,
+        maxTokens: 1000
+      })
+
+      if (!response.success || !response.data) {
+        throw new Error(response.error || 'AI 생성 실패')
+      }
+
+      const content = response.data.text
+
+      if (content) {
+        try {
+          // JSON 응답에서 배열 추출
+          const jsonMatch = content.match(/\[[\s\S]*?\]/)
+          if (jsonMatch) {
+            const keywords = JSON.parse(jsonMatch[0])
+            if (Array.isArray(keywords) && keywords.length > 0) {
+              return keywords
+            }
+          }
+        } catch (parseError) {
+          console.warn('AI 응답 JSON 파싱 실패:', parseError)
+        }
+      }
+    } catch (error) {
+      console.error('AI 서비스 호출 오류:', error)
+    }
+
+    // 오류 시 기본 데이터 반환
+    return this.getDefaultKeywords(topic, industry)
+  }
   private async analyzeKeywordsWithNaver(topic: string, industry: string) {
     try {
       // 네이버 API 인증정보 조회
@@ -173,63 +223,7 @@ export class TrendKeywordAgent extends BaseAgent {
     return ['연중', '여름', '겨울']
   }
 
-  private async generateKeywordsWithAI(topic: string, industry: string, apiKey: string) {
-    const prompt = `다음 주제에 대한 효과적인 SEO 키워드 5개를 생성해주세요:
 
-주제: ${topic}
-산업: ${industry}
-
-각 키워드에 대해 다음 정보를 JSON 배열 형식으로 제공해주세요:
-- keyword: 키워드 내용
-- searchVolume: 예상 월간 검색량 (100-10000 범위의 숫자)
-- competition: 경쟁도 ("low", "medium", "high" 중 하나)
-- trend: 트렌드 ("rising", "stable", "declining" 중 하나)
-
-응답은 반드시 유효한 JSON 배열 형태로만 해주세요.`
-
-    try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01'
-        },
-        body: JSON.stringify({
-          model: 'claude-3-haiku-20240307',
-          max_tokens: 1000,
-          messages: [{ role: 'user', content: prompt }]
-        })
-      })
-
-      if (!response.ok) {
-        throw new Error(`Claude API error: ${response.statusText}`)
-      }
-
-      const result = await response.json()
-      const content = result.content?.[0]?.text
-
-      if (content) {
-        try {
-          // JSON 응답에서 배열 추출
-          const jsonMatch = content.match(/\[[\s\S]*?\]/)
-          if (jsonMatch) {
-            const keywords = JSON.parse(jsonMatch[0])
-            if (Array.isArray(keywords) && keywords.length > 0) {
-              return keywords
-            }
-          }
-        } catch (parseError) {
-          console.warn('AI 응답 JSON 파싱 실패:', parseError)
-        }
-      }
-    } catch (error) {
-      console.error('Claude API 호출 오류:', error)
-    }
-
-    // 오류 시 기본 데이터 반환
-    return this.getDefaultKeywords(topic, industry)
-  }
 
   private getDefaultKeywords(topic: string, industry: string) {
     return [
