@@ -25,8 +25,12 @@ export function KakaoLoginButton() {
                 return
             }
 
-            // Vercel 환경에서 확실한 URL 보장을 위해 환경변수 우선 사용
-            const origin = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin
+            // Vercel Preview/Production 환경 차이로 인한 PKCE 쿠키 불일치 방지
+            // 항상 현재 브라우저의 도메인을 기준으로 redirect 해야 쿠키를 읽을 수 있음
+            const origin = typeof window !== 'undefined' && window.location.origin
+                ? window.location.origin
+                : process.env.NEXT_PUBLIC_SITE_URL
+
             const redirectTo = `${origin}/auth/callback`
 
             console.log('Starting OAuth with redirect:', redirectTo)
