@@ -175,8 +175,13 @@ class AdminAuthService {
           if (createResult.success && createResult.admin) {
             // 생성된 계정으로 로그인 진행
             admin = createResult.admin
+            admin = createResult.admin
           } else {
-            return { success: false, error: '초기 관리자 계정 생성에 실패했습니다.' }
+            console.error('Auto-seeding failed:', createResult.error)
+            return {
+              success: false,
+              error: `초기 관리자 계정 생성 실패: ${createResult.error || '알 수 없는 오류'}`
+            }
           }
         } else {
           return { success: false, error: '사용자명 또는 비밀번호가 올바르지 않습니다.' }
