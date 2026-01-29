@@ -15,8 +15,7 @@ import {
     TableRow,
 } from '@/components/ui/table'
 import { FileText, PlusCircle, ArrowRight, Loader2, Calendar, Layout } from 'lucide-react'
-import { format } from 'date-fns'
-import { ko } from 'date-fns/locale'
+
 
 interface Project {
     id: string
@@ -157,7 +156,11 @@ export default function ProjectsPage() {
                                             <TableCell>
                                                 <div className="flex items-center text-sm text-muted-foreground">
                                                     <Calendar className="w-3.5 h-3.5 mr-1.5" />
-                                                    {format(new Date(project.created_at), 'yyyy.MM.dd', { locale: ko })}
+                                                    {new Date(project.created_at).toLocaleDateString('ko-KR', {
+                                                        year: 'numeric',
+                                                        month: '2-digit',
+                                                        day: '2-digit'
+                                                    })}
                                                 </div>
                                             </TableCell>
                                             <TableCell className="text-right pr-6">

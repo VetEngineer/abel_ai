@@ -19,6 +19,7 @@ interface User {
   created_at: string
   last_login_at?: string
   status?: string
+  credits?: number
 }
 
 export default function UserManagement() {
