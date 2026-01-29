@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+import { createBrowserClient } from '@supabase/ssr'
 
 // 데이터베이스 타입 정의
 export interface Database {
@@ -150,7 +150,7 @@ export const getBrowserSupabaseClient = () => {
     return null
   }
 
-  browserClient = createClient(supabaseUrl, supabaseAnonKey)
+  browserClient = createBrowserClient(supabaseUrl, supabaseAnonKey)
   return browserClient
 }
 
