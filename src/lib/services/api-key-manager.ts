@@ -255,10 +255,49 @@ class APIKeyManager {
         allKeys = [...storedKeys, ...memoryKeys]
       }
 
-      // 3. Convert to Config format and Decrypt for display? 
-      // Usually we don't display full key, but for editing we might need it.
-      // Admin might want to see verify key. 
-      // Let's decrypt it here.
+      // 3. Inject Environment keys for other services if they exist and are not in storage
+      const envServices = [
+        { name: 'claude', key: process.env.CLAUDE_API_KEY, display: 'Environment Claude Key' },
+        { name: 'openai', key: process.env.OPENAI_API_KEY, display: 'Environment OpenAI Key' },
+        { name: 'gemini', key: process.env.GOOGLE_AI_API_KEY, display: 'Environment Gemini Key' },
+        { name: 'stripe', key: process.env.STRIPE_SECRET_KEY, display: 'Environment Stripe Key' }
+      ]
+
+      for (const env of envServices) {
+        // If key exists in env AND not already present in the list (by service name)
+        // Note: You might want to allow both, but typically env is fallback. 
+        // Let's show it if NO active key for this service exists in storage? 
+        // OR just show it as a separate entry? separate entry is better for visibility.
+        // But we should check if unique constraints matter. 
+        // Let's just add it with a specific ID.
+
+        if (env.key) {
+          // Check if we already have an "Environment" key represented (unlikely for these)
+          // or if we want to dedupe. For now, let's just add it.
+          // Maybe check if any key for this service exists? 
+          // Users might want to see that the Env key is available even if they added a DB key.
+
+          const envKeyEntry: any = {
+            id: `env-${env.name}`,
+            service_name: env.name,
+            api_key: env.key, // Will be "decrypted" (passed through) below
+            api_key_name: env.display,
+            is_active: true, // Env keys are always "active" if present
+            rate_limit_per_minute: 0,
+            monthly_budget_usd: 0,
+            current_month_cost: 0,
+            usage_count: 0,
+            last_used: undefined
+          }
+
+          // Only add if not already in the list (naive check by ID or similar?)
+          if (!allKeys.find(k => k.id === envKeyEntry.id)) {
+            allKeys.push(envKeyEntry)
+          }
+        }
+      }
+
+      // 4. Convert to Config format and Decrypt for display?
 
       const apiKeys: APIKeyConfig[] = allKeys.map(key => ({
         id: key.id,
