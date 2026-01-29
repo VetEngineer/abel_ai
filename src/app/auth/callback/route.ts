@@ -36,8 +36,9 @@ export async function GET(request: Request) {
             return NextResponse.redirect(`${origin}${next}`)
         } else {
             console.error('Auth Exchange Error:', error)
+            return NextResponse.redirect(`${origin}/auth/auth-code-error?error=${encodeURIComponent(error.message)}`)
         }
     }
 
-    return NextResponse.redirect(`${origin}/auth/auth-code-error`)
+    return NextResponse.redirect(`${origin}/auth/auth-code-error?error=No+Code+Provided`)
 }
