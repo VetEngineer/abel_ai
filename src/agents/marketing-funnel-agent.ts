@@ -157,8 +157,8 @@ export class MarketingFunnelAgent extends BaseAgent {
 
     try {
       const response = await aiServiceRouter.generateText({
-        service: 'claude',
-        model: 'claude-3-haiku-20240307',
+        service: 'openai',
+        model: 'gpt-5.2-xhigh',
         prompt: prompt,
         userId: userId,
         maxTokens: 3500,

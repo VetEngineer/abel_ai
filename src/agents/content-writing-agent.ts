@@ -97,7 +97,7 @@ export class ContentWritingAgent extends BaseAgent {
     try {
       const response = await aiServiceRouter.generateText({
         service: 'claude',
-        model: 'claude-3-opus-20240229', // High quality model for long content
+        model: 'claude-opus-4.5', // High quality model for long content
         prompt: prompt,
         userId: userId,
         maxTokens: 4000,

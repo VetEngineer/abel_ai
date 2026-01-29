@@ -25,7 +25,7 @@ export interface AIResponse {
 
 export interface ImageGenerationRequest {
   prompt: string
-  model: 'gemini-nano-banana'
+  model: 'gemini-nano-banana' | 'gemini-nano-banana-pro'
   size?: '512x512' | '1024x1024'
   userId: string
   contentId?: string
@@ -45,7 +45,7 @@ export interface ImageGenerationResponse {
 class AIServiceRouter {
   private static instance: AIServiceRouter
 
-  private constructor() {}
+  private constructor() { }
 
   public static getInstance(): AIServiceRouter {
     if (!AIServiceRouter.instance) {

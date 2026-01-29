@@ -81,6 +81,23 @@ export class AnswerOptimizationAgent extends BaseAgent {
       const voiceSearchOptimization = this.optimizeForVoiceSearch(normalizedInput)
       const knowledgeGraph = this.prepareKnowledgeGraph(normalizedInput)
 
+      // Claude AEO/GEO Review
+      const aeoReview = await this.reviewWithClaudeAEO({
+        topic: normalizedInput.topic,
+        faqSections,
+        featuredSnippets
+      }, normalizedInput.specialization, context.userId || 'anonymous')
+
+      // Merge AI improvements if available
+      if (aeoReview) {
+        if (aeoReview.improvedFAQs) {
+          faqSections.push(...aeoReview.improvedFAQs)
+        }
+        if (aeoReview.geoTips) {
+          voiceSearchOptimization.naturalLanguageAnswers.push(...aeoReview.geoTips)
+        }
+      }
+
       const output: AnswerOptimizationOutput = {
         faqSections,
         featuredSnippets,
@@ -569,5 +586,44 @@ ${professionalTone} 이 질문은 ${targetAudience}께서 자주 궁금해하시
       'other': 'Service'
     }
     return types[specialization] || 'Article'
+  }
+
+  private async reviewWithClaudeAEO(data: any, specialization: string, userId: string): Promise<any> {
+    const prompt = `당신은 AEO(Answer Engine Optimization) 및 GEO(Generative Engine Optimization) 전문가입니다.
+다음 생성된 FAQ와 스니펫이 AI 검색 엔진(ChatGPT, Perplexity 등)에서 인용되기 쉽도록 검토하고 보완해주세요.
+
+컨텍스트:
+- 주제: ${data.topic}
+- 분야: ${specialization}
+
+현재 데이터:
+${JSON.stringify(data, null, 2).substring(0, 1500)}...
+
+다음 JSON 형식으로 개선안을 제안해주세요:
+{
+  "improvedFAQs": [
+    { "question": "AI가 좋아할만한 질문", "answer": "구조화되고 명확한 답변", "category": "AEO추천", "keywords": ["키워드"] }
+  ],
+  "geoTips": ["GEO를 위한 답변 최적화 팁 1", "팁 2"]
+}
+응답은 오직 유효한 JSON이어야 합니다.`
+
+    try {
+      const response = await aiServiceRouter.generateText({
+        service: 'claude',
+        model: 'claude-3-haiku-20240307',
+        prompt: prompt,
+        userId: userId,
+        maxTokens: 2000
+      })
+
+      if (response.success && response.data) {
+        const jsonMatch = response.data.text.match(/\{[\s\S]*\}/)
+        return jsonMatch ? JSON.parse(jsonMatch[0]) : null
+      }
+    } catch (e) {
+      console.warn('AEO Review failed, continuing with rule-based results', e)
+      return null
+    }
   }
 }

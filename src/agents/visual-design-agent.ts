@@ -183,7 +183,7 @@ export class VisualDesignAgent extends BaseAgent {
     try {
       const response = await aiServiceRouter.generateImage({
         prompt: prompt,
-        model: 'gemini-nano-banana',
+        model: 'gemini-nano-banana-pro',
         size: '1024x1024',
         userId: userId
       })

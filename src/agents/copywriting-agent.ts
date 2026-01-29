@@ -9,6 +9,7 @@ export interface CopywritingInput {
   brandVoice: string
   targetAudience: string
   contentGoals: string
+  existingReviews?: string[] // Added existing reviews field
 }
 
 export interface CopywritingOutput {
@@ -63,11 +64,12 @@ export class CopywritingAgent extends BaseAgent {
       const brandVoice = input?.brandVoice || context?.brandTone || '전문적인'
       const targetAudience = input?.targetAudience || context?.targetAudience || '일반 사용자'
       const contentGoals = input?.contentGoals || context?.contentGoal || 'engagement'
+      const existingReviews = input?.existingReviews || [] // Extract existing reviews
       const userId = context.userId || 'anonymous'
 
       // AI를 사용하여 카피라이팅 생성
       const aiOutput = await this.generateCopyWithAI({
-        seoData, specialization, brandVoice, targetAudience, contentGoals
+        seoData, specialization, brandVoice, targetAudience, contentGoals, existingReviews
       }, userId)
 
       const output: CopywritingOutput = aiOutput
@@ -119,7 +121,7 @@ testimonialFramework는 가상의 고객 후기를 포함해야 합니다.
     "newsletter": "뉴스레터 구독 권유 문구"
   },
   "testimonialFramework": {
-    "suggestedQuotes": ["가상 추천사 1", "가상 추천사 2"],
+    "suggestedQuotes": ["기존 후기를 각색한 추천사 1 (창작 금지)", "기존 후기를 각색한 추천사 2 (창작 금지)"],
     "clientTypes": ["예상 고객 유형 1", "예상 고객 유형 2"],
     "credibilityElements": ["신뢰도 요소 1", "요소 2"]
   },

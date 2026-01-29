@@ -31,48 +31,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (projectId === DEMO_PROJECT_ID) {
-      const workflowId = `workflow_${Date.now()}`
+    const workflowId = `workflow_${Date.now()}`
 
-      demoWorkflows[workflowId] = {
-        id: workflowId,
-        content_id: contentId,
-        project_id: projectId,
-        status: 'running',
-        current_step: 0,
-        total_steps: 11,
-        shared_context: {
-          keywords: [],
-          targetAudience: targetAudience || '일반 사용자',
-          contentGoal: 'engagement',
-          brandTone: brandVoice || '친근한',
-          platform: 'blog'
-        },
-        agent_executions: [],
-        created_at: new Date().toISOString(),
-        content: {
-          title: `${topic} - 자동 생성 콘텐츠`,
-          status: 'draft'
-        }
-      }
-
-      simulateDemoWorkflowExecution(workflowId, topic)
-
-      return NextResponse.json({
-        workflowId,
-        status: 'started',
-        message: '데모 워크플로우가 시작되었습니다.'
-      })
-    }
-
-    const workflowId = `real_workflow_${Date.now()}`
-
-    // 초기 워크플로우 상태 설정
-    workflows[workflowId] = {
+    demoWorkflows[workflowId] = {
       id: workflowId,
       content_id: contentId,
       project_id: projectId,
-      user_id: userId,
       status: 'running',
       current_step: 0,
       total_steps: 11,
@@ -86,29 +50,75 @@ export async function POST(request: NextRequest) {
       agent_executions: [],
       created_at: new Date().toISOString(),
       content: {
-        title: `${topic} - AI 생성 콘텐츠`,
-        status: 'generating'
-      },
-      topic,
-      industry
+        title: `${topic} - 자동 생성 콘텐츠`,
+        status: 'draft'
+      }
     }
 
-    // 백그라운드에서 실제 워크플로우 실행
-    executeRealWorkflow(workflowId, topic, industry, targetAudience, brandVoice, userId)
+    // [Option B] Real Execution for Demo
+    // simulateDemoWorkflowExecution(workflowId, topic) -> Removed
+    // Use executeRealWorkflow but point to demoWorkflows storage implicitly by using the same ID?
+    // Actually executeRealWorkflow uses 'workflows' global.
+    // We should adapt executeRealWorkflow to support demo persistence or just use the real workflow path.
+
+    // Better approach: Call executeRealWorkflow but pass a flag or handle storage
+    // For simplicity in this "Option B" request, I will duplicate the execution logic here
+    // but targeting demoWorkflows, OR just redirect to real workflow execution.
+
+    // Let's use the real execution logic but save to demoWorkflows to keep UI working
+    executeRealWorkflow(workflowId, topic, industry || 'general', targetAudience, brandVoice, userId, true)
 
     return NextResponse.json({
       workflowId,
       status: 'started',
-      message: '실제 AI 워크플로우가 시작되었습니다.'
+      message: '실제 AI 워크플로우가 시작되었습니다. (Demo Mode)'
     })
-
-  } catch (error) {
-    console.error('Real workflow creation error:', error)
-    return NextResponse.json(
-      { error: '워크플로우 실행 중 오류가 발생했습니다.' },
-      { status: 500 }
-    )
   }
+
+    const workflowId = `real_workflow_${Date.now()}`
+
+  // 초기 워크플로우 상태 설정
+  workflows[workflowId] = {
+    id: workflowId,
+    content_id: contentId,
+    project_id: projectId,
+    user_id: userId,
+    status: 'running',
+    current_step: 0,
+    total_steps: 11,
+    shared_context: {
+      keywords: [],
+      targetAudience: targetAudience || '일반 사용자',
+      contentGoal: 'engagement',
+      brandTone: brandVoice || '친근한',
+      platform: 'blog'
+    },
+    agent_executions: [],
+    created_at: new Date().toISOString(),
+    content: {
+      title: `${topic} - AI 생성 콘텐츠`,
+      status: 'generating'
+    },
+    topic,
+    industry
+  }
+
+  // 백그라운드에서 실제 워크플로우 실행
+  executeRealWorkflow(workflowId, topic, industry, targetAudience, brandVoice, userId)
+
+  return NextResponse.json({
+    workflowId,
+    status: 'started',
+    message: '실제 AI 워크플로우가 시작되었습니다.'
+  })
+
+} catch (error) {
+  console.error('Real workflow creation error:', error)
+  return NextResponse.json(
+    { error: '워크플로우 실행 중 오류가 발생했습니다.' },
+    { status: 500 }
+  )
+}
 }
 
 export async function GET(request: NextRequest) {
@@ -142,7 +152,8 @@ async function executeRealWorkflow(
   industry: string,
   targetAudience: string,
   brandVoice: string,
-  userId: string
+  userId: string,
+  isDemo: boolean = false
 ) {
   try {
     // 실제 에이전트 coordinator 인스턴스 생성
@@ -175,7 +186,9 @@ async function executeRealWorkflow(
 
     // 워크플로우 실행
     const finalResult = await coordinator.executeWorkflow(initialInput, sharedContext, (update) => {
-      const workflow = workflows[workflowId]
+      // Choose storage based on mode
+      const targetWorkflows = isDemo ? demoWorkflows : workflows
+      const workflow = targetWorkflows[workflowId]
       if (!workflow) return
 
       const existingIndex = workflow.agent_executions.findIndex(
@@ -205,9 +218,10 @@ async function executeRealWorkflow(
     })
 
     // 워크플로우 완료 처리
-    if (workflows[workflowId]) {
-      workflows[workflowId].status = 'completed'
-      workflows[workflowId].completed_at = new Date().toISOString()
+    const targetWorkflows = isDemo ? demoWorkflows : workflows
+    if (targetWorkflows[workflowId]) {
+      targetWorkflows[workflowId].status = 'completed'
+      targetWorkflows[workflowId].completed_at = new Date().toISOString()
 
       // 워크플로우 상태에서 개별 에이전트 결과 수집
       const workflowSteps = coordinator.getWorkflowSteps()
@@ -224,13 +238,13 @@ async function executeRealWorkflow(
         content: contentResults?.output?.content
       }
 
-      workflows[workflowId].final_result = enrichedResult
-      workflows[workflowId].content.status = 'completed'
+      targetWorkflows[workflowId].final_result = enrichedResult
+      targetWorkflows[workflowId].content.status = 'completed'
 
       // 생성된 콘텐츠 저장
       if (enrichedResult && enrichedResult.content) {
-        workflows[workflowId].content = {
-          ...workflows[workflowId].content,
+        targetWorkflows[workflowId].content = {
+          ...targetWorkflows[workflowId].content,
           ...enrichedResult.content
         }
       }
@@ -241,10 +255,13 @@ async function executeRealWorkflow(
   } catch (error) {
     console.error(`워크플로우 실행 실패 (${workflowId}):`, error)
 
-    if (workflows[workflowId]) {
-      workflows[workflowId].status = 'failed'
-      workflows[workflowId].error = error instanceof Error ? error.message : '알 수 없는 오류'
-      workflows[workflowId].completed_at = new Date().toISOString()
+    console.error(`워크플로우 실행 실패 (${workflowId}):`, error)
+
+    const targetWorkflows = isDemo ? demoWorkflows : workflows
+    if (targetWorkflows[workflowId]) {
+      targetWorkflows[workflowId].status = 'failed'
+      targetWorkflows[workflowId].error = error instanceof Error ? error.message : '알 수 없는 오류'
+      targetWorkflows[workflowId].completed_at = new Date().toISOString()
     }
   }
 }
