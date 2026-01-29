@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getMCPSupabaseClient } from '@/lib/supabase/client'
 import { AgentCoordinator } from '@/lib/agents/agent-coordinator'
 import { SharedContext, AgentType } from '@/types/agents'
 
@@ -55,18 +56,68 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // [Option B] Real Execution for Demo
-    // simulateDemoWorkflowExecution(workflowId, topic) -> Removed
-    // Use executeRealWorkflow but point to demoWorkflows storage implicitly by using the same ID?
-    // Actually executeRealWorkflow uses 'workflows' global.
-    // We should adapt executeRealWorkflow to support demo persistence or just use the real workflow path.
+    // [Credit System] & [DB Persistence]
+    let isRealUser = userId && userId !== 'demo-user'
+    let realProjectId = projectId
+    let realContentId = contentId
 
-    // Better approach: Call executeRealWorkflow but pass a flag or handle storage
-    // For simplicity in this "Option B" request, I will duplicate the execution logic here
-    // but targeting demoWorkflows, OR just redirect to real workflow execution.
+    if (isRealUser) {
+      const supabase = await getMCPSupabaseClient()
 
-    // Let's use the real execution logic but save to demoWorkflows to keep UI working
-    executeRealWorkflow(workflowId, topic, industry || 'general', targetAudience, brandVoice, userId, true)
+      // 1. Check & Deduct Credits
+      const { creditService } = await import('@/lib/services/credit-service')
+      const COST_PER_POST = 10
+
+      const creditResult = await creditService.deductCredits(userId, COST_PER_POST, `Project Creation: ${topic}`)
+      if (!creditResult.success) {
+        return NextResponse.json(
+          { error: `크레딧이 부족합니다. (필요: ${COST_PER_POST} CR)` },
+          { status: 402 }
+        )
+      }
+
+      // 2. Create DB Records (Projects & Content)
+      // Note: We create a new project for this workflow to persist it
+      const { data: projectData, error: projectError } = await supabase
+        .from('projects')
+        .insert({
+          user_id: userId,
+          name: topic,
+          description: `Generated content for ${topic}`,
+          settings: { industry, targetAudience, brandVoice }
+        })
+        .select()
+        .single()
+
+      if (projectError || !projectData) {
+        // Refund if project creation fails
+        await creditService.refundCredits(userId, COST_PER_POST, 'System Error: Project Creation Failed')
+        throw new Error('Project database creation failed')
+      }
+
+      realProjectId = projectData.id
+
+      const { data: contentData, error: contentError } = await supabase
+        .from('content')
+        .insert({
+          project_id: realProjectId,
+          title: topic,
+          status: 'draft',
+          keyword_data: {} // Assuming schema allows JSONB or text
+        })
+        .select()
+        .single()
+
+      if (contentError || !contentData) {
+        throw new Error('Content database creation failed')
+      }
+
+      realContentId = contentData.id
+    }
+
+    // [Option B] Real Execution
+    // If real user, pass persistToDB=true (logic needs implementation in executeRealWorkflow)
+    executeRealWorkflow(workflowId, topic, industry || 'general', targetAudience, brandVoice, userId, !isRealUser, realProjectId, realContentId)
 
     return NextResponse.json({
       workflowId,
@@ -114,7 +165,9 @@ async function executeRealWorkflow(
   targetAudience: string,
   brandVoice: string,
   userId: string,
-  isDemo: boolean = false
+  isDemo: boolean = false,
+  dbProjectId?: string,
+  dbContentId?: string
 ) {
   try {
     // 실제 에이전트 coordinator 인스턴스 생성
