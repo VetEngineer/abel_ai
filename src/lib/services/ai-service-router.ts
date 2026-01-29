@@ -84,28 +84,55 @@ class AIServiceRouter {
       // 서비스별 API 호출
       let response: AIResponse
 
-      // [Option B] Real Execution Model Mapping
-      // 사용자가 요청한 가상 모델명을 실제 작동하는 API 모델명으로 매핑합니다.
-      let realModel = request.model
-      if (request.model === 'claude-opus-4.5') realModel = 'claude-3-opus-20240229'
-      if (request.model === 'gpt-5.2-xhigh') realModel = 'gpt-4-turbo'
-      if (request.model === 'gemini-nano-banana-pro') realModel = 'gemini-1.5-pro-latest'
+      try {
+        // [Option B] 1차 시도: 사용자가 요청한 모델 그대로 시도
+        // (미래 모델이나 특수 모델명이 실제 유효할 경우를 대비)
+        switch (request.service) {
+          case 'claude':
+            response = await this.callClaudeAPI(apiKey, request)
+            break
+          case 'openai':
+            response = await this.callOpenAIAPI(apiKey, request)
+            break
+          case 'gemini':
+            response = await this.callGeminiAPI(apiKey, request)
+            break
+          default:
+            throw new Error(`Unsupported service: ${request.service}`)
+        }
+      } catch (error: any) {
+        // [Fallback Strategy]
+        // 1차 시도 실패 시 (404 Not Found, 400 Bad Request 등), 안정적인 레거시 모델로 재시도
+        console.warn(`Primary model (${request.model}) failed. Attempting fallback... Error:`, error.message)
 
-      // 요청 객체 업데이트
-      const effectiveRequest = { ...request, model: realModel }
+        let fallbackModel = ''
+        // 모델명에 따른 적절한 대체 모델 선정
+        if (request.service === 'claude') fallbackModel = 'claude-3-opus-20240229'
+        if (request.service === 'openai') fallbackModel = 'gpt-4-turbo'
+        if (request.service === 'gemini') fallbackModel = 'gemini-1.5-pro-latest'
 
-      switch (request.service) {
-        case 'claude':
-          response = await this.callClaudeAPI(apiKey, effectiveRequest)
-          break
-        case 'openai':
-          response = await this.callOpenAIAPI(apiKey, effectiveRequest)
-          break
-        case 'gemini':
-          response = await this.callGeminiAPI(apiKey, effectiveRequest)
-          break
-        default:
-          throw new Error(`Unsupported service: ${request.service}`)
+        // 대체 모델이 존재하고, 원래 요청 모델과 다를 경우에만 재시도
+        if (fallbackModel && fallbackModel !== request.model) {
+          console.log(`Fallback to: ${fallbackModel}`)
+          const fallbackRequest = { ...request, model: fallbackModel }
+
+          switch (request.service) {
+            case 'claude':
+              response = await this.callClaudeAPI(apiKey, fallbackRequest)
+              break
+            case 'openai':
+              response = await this.callOpenAIAPI(apiKey, fallbackRequest)
+              break
+            case 'gemini':
+              response = await this.callGeminiAPI(apiKey, fallbackRequest)
+              break
+            default:
+              throw error
+          }
+        } else {
+          // 대체 불가능하면 에러 전파
+          throw error
+        }
       }
 
       // 사용량 기록
