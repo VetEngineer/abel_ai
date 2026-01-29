@@ -16,32 +16,38 @@ interface LogEntry {
 export default function RealTimeLog() {
     const [logs, setLogs] = useState<LogEntry[]>([])
 
-    // 데모용 더미 로그 생성기
-    useEffect(() => {
-        const addLog = () => {
-            const sources = ['System', 'AgentCoordinator', 'Supabase', 'OpenAI', 'Claude']
-            const levels: LogEntry['level'][] = ['info', 'info', 'info', 'success', 'warn']
-            const messages = [
-                'API Health Check: OK',
-                'Token usage updated for user: demo-user',
-                'New workflow request received',
-                'Cache invalidated for key: trends-2024',
-                'Rate limit approaching for Gemini API'
-            ]
+    // 수동 새로고침 함수
+    const fetchLogs = () => {
+        const sources = ['System', 'AgentCoordinator', 'Supabase', 'OpenAI', 'Claude']
+        const levels: LogEntry['level'][] = ['info', 'info', 'info', 'success', 'warn']
+        const messages = [
+            'API Health Check: OK',
+            'Token usage updated for user: demo-user',
+            'New workflow request received',
+            'Cache invalidated for key: trends-2024',
+            'Rate limit approaching for Gemini API'
+        ]
 
-            const newLog: LogEntry = {
-                id: Date.now().toString(),
+        // 한 번에 3~5개의 로그 시뮬레이션
+        const count = Math.floor(Math.random() * 3) + 1
+        const newLogs: LogEntry[] = []
+
+        for (let i = 0; i < count; i++) {
+            newLogs.push({
+                id: Date.now().toString() + i,
                 timestamp: new Date().toLocaleTimeString(),
                 level: levels[Math.floor(Math.random() * levels.length)],
                 message: messages[Math.floor(Math.random() * messages.length)],
                 source: sources[Math.floor(Math.random() * sources.length)]
-            }
-
-            setLogs(prev => [newLog, ...prev].slice(0, 50)) // 최근 50개만 유지
+            })
         }
 
-        const interval = setInterval(addLog, 3000)
-        return () => clearInterval(interval)
+        setLogs(prev => [...newLogs, ...prev].slice(0, 50))
+    }
+
+    // 초기 로드 시 1회 실행
+    useEffect(() => {
+        fetchLogs()
     }, [])
 
     return (
@@ -52,9 +58,17 @@ export default function RealTimeLog() {
                         <Terminal className="w-5 h-5 text-primary" />
                         시스템 실시간 로그
                     </CardTitle>
-                    <Badge variant="outline" className="animate-pulse bg-green-100 text-green-700 border-green-200">
-                        <Activity className="w-3 h-3 mr-1" /> Live
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="bg-green-100 text-green-700 border-green-200">
+                            <Activity className="w-3 h-3 mr-1" /> Live
+                        </Badge>
+                        <button
+                            onClick={fetchLogs}
+                            className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded hover:bg-primary/90 transition-colors"
+                        >
+                            새로고침
+                        </button>
+                    </div>
                 </div>
             </CardHeader>
             <CardContent className="p-0 flex-1 overflow-hidden">

@@ -1,19 +1,162 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { useToast } from '@/hooks/use-toast'
+import { Search, UserCog, Mail, Calendar } from 'lucide-react'
+
+interface User {
+  id: string
+  email: string
+  name: string
+  subscription_tier: string
+  created_at: string
+  last_login_at?: string
+  status?: string
+}
 
 export default function UserManagement() {
+  const [users, setUsers] = useState<User[]>([])
+  const [loading, setLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState('')
+  const { toast } = useToast()
+
+  useEffect(() => {
+    fetchUsers()
+  }, [])
+
+  const fetchUsers = async () => {
+    try {
+      const token = localStorage.getItem('admin_token')
+      const response = await fetch('/api/admin/users', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      if (!response.ok) throw new Error('Failed to fetch users')
+
+      const data = await response.json()
+      setUsers(data.users || [])
+    } catch (error) {
+      console.error('사용자 목록 조회 실패:', error)
+      toast({
+        title: "오류",
+        description: "사용자 목록을 불러오는데 실패했습니다.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const filteredUsers = users.filter(user =>
+    user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    user.email?.toLowerCase().includes(searchTerm.toLowerCase())
+  )
+
+  const getTierBadgeColor = (tier: string) => {
+    switch (tier?.toLowerCase()) {
+      case 'pro': return 'bg-purple-100 text-purple-800 border-purple-200'
+      case 'enterprise': return 'bg-blue-100 text-blue-800 border-blue-200'
+      case 'basic': return 'bg-green-100 text-green-800 border-green-200'
+      default: return 'bg-gray-100 text-gray-800 border-gray-200'
+    }
+  }
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>사용자 관리</CardTitle>
-        <CardDescription>
-          시스템 사용자를 관리하고 권한을 설정합니다.
-        </CardDescription>
+    <Card className="card-enhanced border-none shadow-md">
+      <CardHeader className="bg-primary/5 pb-6 border-b border-primary/10">
+        <div className="flex justify-between items-center">
+          <div>
+            <CardTitle className="text-xl text-primary flex items-center gap-2">
+              <span className="text-2xl">👥</span> 사용자 관리
+            </CardTitle>
+            <CardDescription className="mt-1 text-base">
+              서비스 가입 사용자를 조회하고 관리합니다.
+            </CardDescription>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="relative w-64">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="이름 또는 이메일 검색..."
+                className="pl-9 bg-background"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <Button onClick={fetchUsers} variant="outline" size="icon">
+              <UserCog className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
       </CardHeader>
-      <CardContent>
-        <p className="text-muted-foreground">사용자 관리 기능이 곧 추가될 예정입니다.</p>
+      <CardContent className="p-0">
+        <div className="rounded-md border-0">
+          <Table>
+            <TableHeader className="bg-muted/50">
+              <TableRow>
+                <TableHead className="pl-6">사용자 정보</TableHead>
+                <TableHead>구독 등급</TableHead>
+                <TableHead>가입일</TableHead>
+                <TableHead>상태</TableHead>
+                <TableHead className="text-right pr-6">관리</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
+                    데이터를 불러오는 중...
+                  </TableCell>
+                </TableRow>
+              ) : filteredUsers.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
+                    검색 결과가 없습니다.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredUsers.map((user) => (
+                  <TableRow key={user.id} className="hover:bg-muted/5 transition-colors">
+                    <TableCell className="pl-6">
+                      <div className="flex flex-col">
+                        <span className="font-medium text-base">{user.name}</span>
+                        <span className="text-sm text-muted-foreground flex items-center gap-1">
+                          <Mail className="w-3 h-3" /> {user.email}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={getTierBadgeColor(user.subscription_tier)}>
+                        {user.subscription_tier || 'Free'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                        <Calendar className="w-3 h-3" />
+                        {new Date(user.created_at).toLocaleDateString('ko-KR')}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={user.status === 'banned' ? 'destructive' : 'secondary'}>
+                        {user.status === 'banned' ? '정지됨' : '활동 중'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right pr-6">
+                      <Button variant="ghost" size="sm">상세보기</Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </CardContent>
     </Card>
   )
