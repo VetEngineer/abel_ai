@@ -29,6 +29,14 @@ export async function GET(request: Request) {
     console.log('Final Redirect Origin:', origin)
     console.log('---------------------------')
 
+    const errorParam = searchParams.get('error')
+    const errorDescription = searchParams.get('error_description')
+
+    if (errorParam) {
+        console.error('OAuth Error params:', errorParam, errorDescription)
+        return NextResponse.redirect(`${origin}/auth/auth-code-error?error=${encodeURIComponent(errorParam)}&details=${encodeURIComponent(errorDescription || '')}`)
+    }
+
     if (code) {
         const supabase = createClient()
         const { error } = await supabase.auth.exchangeCodeForSession(code)
@@ -40,5 +48,7 @@ export async function GET(request: Request) {
         }
     }
 
-    return NextResponse.redirect(`${origin}/auth/auth-code-error?error=No+Code+Provided`)
+    // 디버깅을 위해 받은 모든 파라미터를 에러 메시지에 포함
+    const paramsString = Array.from(searchParams.entries()).map(([k, v]) => `${k}=${v}`).join(', ')
+    return NextResponse.redirect(`${origin}/auth/auth-code-error?error=No+Code+Provided&details=${encodeURIComponent(paramsString)}`)
 }
