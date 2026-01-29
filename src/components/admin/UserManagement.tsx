@@ -7,7 +7,9 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
-import { Search, UserCog, Mail, Calendar } from 'lucide-react'
+import { Search, UserCog, Mail, Calendar, CreditCard, Plus, Minus } from 'lucide-react'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
 
 interface User {
   id: string
@@ -21,6 +23,10 @@ interface User {
 
 export default function UserManagement() {
   const [users, setUsers] = useState<User[]>([])
+  const [selectedUser, setSelectedUser] = useState<User | null>(null)
+  const [creditAmount, setCreditAmount] = useState<number>(0)
+  const [creditDescription, setCreditDescription] = useState('')
+  const [creditDialogOpen, setCreditDialogOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const { toast } = useToast()
@@ -52,6 +58,42 @@ export default function UserManagement() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleAdjustCredits = async () => {
+    if (!selectedUser || creditAmount === 0) return
+
+    try {
+      const token = localStorage.getItem('admin_token')
+      const response = await fetch('/api/admin/users/credits', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          userId: selectedUser.id,
+          amount: creditAmount,
+          description: creditDescription || '관리자 수동 조정',
+          transactionType: 'manual_adjustment'
+        })
+      })
+
+      if (!response.ok) throw new Error('Failed to adjust credits')
+
+      toast({ title: '성공', description: '크레딧이 조정되었습니다.' })
+      setCreditDialogOpen(false)
+      fetchUsers() // Refresh list
+    } catch (error) {
+      toast({ title: '오류', description: '크레딧 조정 실패', variant: 'destructive' })
+    }
+  }
+
+  const openCreditDialog = (user: User) => {
+    setSelectedUser(user)
+    setCreditAmount(0)
+    setCreditDescription('')
+    setCreditDialogOpen(true)
   }
 
   const filteredUsers = users.filter(user =>
@@ -103,6 +145,7 @@ export default function UserManagement() {
               <TableRow>
                 <TableHead className="pl-6">사용자 정보</TableHead>
                 <TableHead>구독 등급</TableHead>
+                <TableHead>크레딧</TableHead>
                 <TableHead>가입일</TableHead>
                 <TableHead>상태</TableHead>
                 <TableHead className="text-right pr-6">관리</TableHead>
@@ -111,18 +154,18 @@ export default function UserManagement() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
                     데이터를 불러오는 중...
                   </TableCell>
                 </TableRow>
               ) : filteredUsers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
                     검색 결과가 없습니다.
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredUsers.map((user) => (
+                filteredUsers.map((user: any) => (
                   <TableRow key={user.id} className="hover:bg-muted/5 transition-colors">
                     <TableCell className="pl-6">
                       <div className="flex flex-col">
@@ -138,6 +181,9 @@ export default function UserManagement() {
                       </Badge>
                     </TableCell>
                     <TableCell>
+                      <div className="font-mono font-medium">{user.credits?.toLocaleString() || 0} CR</div>
+                    </TableCell>
+                    <TableCell>
                       <div className="flex items-center gap-1 text-sm text-muted-foreground">
                         <Calendar className="w-3 h-3" />
                         {new Date(user.created_at).toLocaleDateString('ko-KR')}
@@ -148,7 +194,10 @@ export default function UserManagement() {
                         {user.status === 'banned' ? '정지됨' : '활동 중'}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right pr-6">
+                    <TableCell className="text-right pr-6 space-x-2">
+                      <Button variant="outline" size="sm" onClick={() => openCreditDialog(user)}>
+                        <CreditCard className="w-3.5 h-3.5 mr-1" /> 크레딧
+                      </Button>
                       <Button variant="ghost" size="sm">상세보기</Button>
                     </TableCell>
                   </TableRow>
@@ -158,6 +207,46 @@ export default function UserManagement() {
           </Table>
         </div>
       </CardContent>
+
+      <Dialog open={creditDialogOpen} onOpenChange={setCreditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>크레딧 조정: {selectedUser?.name}</DialogTitle>
+            <DialogDescription>
+              사용자에게 크레딧을 추가하거나 차감합니다. (현재: {selectedUser?.credits || 0} CR)
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label>조정 금액 (+/-)</Label>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="icon" onClick={() => setCreditAmount(prev => prev - 100)}><Minus className="h-4 w-4" /></Button>
+                <Input
+                  type="number"
+                  value={creditAmount}
+                  onChange={(e) => setCreditAmount(Number(e.target.value))}
+                  className="text-center"
+                />
+                <Button variant="outline" size="icon" onClick={() => setCreditAmount(prev => prev + 100)}><Plus className="h-4 w-4" /></Button>
+              </div>
+              <p className="text-xs text-muted-foreground">양수는 지급, 음수는 차감입니다.</p>
+            </div>
+            <div className="grid gap-2">
+              <Label>사유 (로그 기록용)</Label>
+              <Input
+                value={creditDescription}
+                onChange={(e) => setCreditDescription(e.target.value)}
+                placeholder="예: 1월 프로모션 지급"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreditDialogOpen(false)}>취소</Button>
+            <Button onClick={handleAdjustCredits}>확인</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
+
   )
 }
