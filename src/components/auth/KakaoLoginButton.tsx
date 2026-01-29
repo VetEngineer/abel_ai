@@ -27,32 +27,40 @@ export function KakaoLoginButton() {
 
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'kakao',
-                options: {
-                    redirectTo: `${window.location.origin}/auth/callback`,
-                },
-            })
+                // Vercel 환경에서 확실한 URL 보장을 위해 환경변수 우선 사용
+                const origin = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin
+            const redirectTo = `${origin}/auth/callback`
+            
+            console.log('Starting OAuth with redirect:', redirectTo)
 
-            if (error) throw error
-        } catch (error: any) {
-            console.error('Kakao login error:', error)
-            alert('카카오 로그인 중 오류가 발생했습니다: ' + error.message)
-        } finally {
-            setLoading(false)
+            const { error } = await supabase.auth.signInWithOAuth({
+                    provider: 'kakao',
+                    options: {
+                        redirectTo,
+                    },
+                })
+
+            if(error) throw error
+            } catch (error: any) {
+                console.error('Kakao login error:', error)
+                alert('카카오 로그인 중 오류가 발생했습니다: ' + error.message)
+            } finally {
+                setLoading(false)
+            }
         }
-    }
 
     return (
-        <Button
-            onClick={handleLogin}
-            disabled={loading}
-            className="w-full bg-[#FEE500] hover:bg-[#FDD835] text-[#000000] font-medium h-12 flex items-center justify-center gap-2"
-        >
-            {loading ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-                <KakaoLogo className="w-5 h-5" />
-            )}
-            {loading ? '로그인 중...' : '카카오로 시작하기'}
-        </Button>
-    )
-}
+            <Button
+                onClick={handleLogin}
+                disabled={loading}
+                className="w-full bg-[#FEE500] hover:bg-[#FDD835] text-[#000000] font-medium h-12 flex items-center justify-center gap-2"
+            >
+                {loading ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                    <KakaoLogo className="w-5 h-5" />
+                )}
+                {loading ? '로그인 중...' : '카카오로 시작하기'}
+            </Button>
+        )
+    }
