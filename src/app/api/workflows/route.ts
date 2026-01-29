@@ -73,52 +73,13 @@ export async function POST(request: NextRequest) {
       status: 'started',
       message: '실제 AI 워크플로우가 시작되었습니다. (Demo Mode)'
     })
+  } catch (error) {
+    console.error('Real workflow creation error:', error)
+    return NextResponse.json(
+      { error: '워크플로우 실행 중 오류가 발생했습니다.' },
+      { status: 500 }
+    )
   }
-
-    const workflowId = `real_workflow_${Date.now()}`
-
-  // 초기 워크플로우 상태 설정
-  workflows[workflowId] = {
-    id: workflowId,
-    content_id: contentId,
-    project_id: projectId,
-    user_id: userId,
-    status: 'running',
-    current_step: 0,
-    total_steps: 11,
-    shared_context: {
-      keywords: [],
-      targetAudience: targetAudience || '일반 사용자',
-      contentGoal: 'engagement',
-      brandTone: brandVoice || '친근한',
-      platform: 'blog'
-    },
-    agent_executions: [],
-    created_at: new Date().toISOString(),
-    content: {
-      title: `${topic} - AI 생성 콘텐츠`,
-      status: 'generating'
-    },
-    topic,
-    industry
-  }
-
-  // 백그라운드에서 실제 워크플로우 실행
-  executeRealWorkflow(workflowId, topic, industry, targetAudience, brandVoice, userId)
-
-  return NextResponse.json({
-    workflowId,
-    status: 'started',
-    message: '실제 AI 워크플로우가 시작되었습니다.'
-  })
-
-} catch (error) {
-  console.error('Real workflow creation error:', error)
-  return NextResponse.json(
-    { error: '워크플로우 실행 중 오류가 발생했습니다.' },
-    { status: 500 }
-  )
-}
 }
 
 export async function GET(request: NextRequest) {
