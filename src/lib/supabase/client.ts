@@ -136,7 +136,11 @@ export async function getMCPSupabaseClient() {
 }
 
 // 클라이언트 사이드용 (브라우저)
+let browserClient: any = null
+
 export const getBrowserSupabaseClient = () => {
+  if (browserClient) return browserClient
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://demo.supabase.co'
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'demo_anon_key'
 
@@ -146,7 +150,8 @@ export const getBrowserSupabaseClient = () => {
     return null
   }
 
-  return createClient(supabaseUrl, supabaseAnonKey)
+  browserClient = createClient(supabaseUrl, supabaseAnonKey)
+  return browserClient
 }
 
 // 기존 호환성을 위한 export (지연 로딩)
