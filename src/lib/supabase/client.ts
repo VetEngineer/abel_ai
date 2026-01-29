@@ -1,4 +1,5 @@
 import { createBrowserClient } from '@supabase/ssr'
+import { createClient } from '@supabase/supabase-js'
 
 // 데이터베이스 타입 정의
 export interface Database {
