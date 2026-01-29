@@ -152,7 +152,7 @@ class AdminAuthService {
       }
 
       const supabase = await getMCPSupabaseClient()
-      const { data: admin, error } = await supabase
+      let { data: admin, error } = await supabase
         .from('admin_accounts')
         .select('*')
         .eq('username', username)
@@ -160,7 +160,27 @@ class AdminAuthService {
         .single()
 
       if (error || !admin) {
-        return { success: false, error: '사용자명 또는 비밀번호가 올바르지 않습니다.' }
+        // DB에 계정이 없지만, 환경변수와 일치하는 경우 -> 초기 계정 자동 생성 (Auto-Seeding)
+        const envUsername = process.env.ADMIN_USERNAME
+        const envPassword = process.env.ADMIN_PASSWORD
+
+        if (envUsername && envPassword && username === envUsername && password === envPassword) {
+          console.log('초기 관리자 계정 자동 생성 중...', username)
+          const createResult = await this.createAdminAccount({
+            username: envUsername,
+            password: envPassword,
+            role: 'super_admin'
+          })
+
+          if (createResult.success && createResult.admin) {
+            // 생성된 계정으로 로그인 진행
+            admin = createResult.admin
+          } else {
+            return { success: false, error: '초기 관리자 계정 생성에 실패했습니다.' }
+          }
+        } else {
+          return { success: false, error: '사용자명 또는 비밀번호가 올바르지 않습니다.' }
+        }
       }
 
       // 비밀번호 검증
