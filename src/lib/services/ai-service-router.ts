@@ -83,15 +83,26 @@ class AIServiceRouter {
 
       // 서비스별 API 호출
       let response: AIResponse
+
+      // [Option B] Real Execution Model Mapping
+      // 사용자가 요청한 가상 모델명을 실제 작동하는 API 모델명으로 매핑합니다.
+      let realModel = request.model
+      if (request.model === 'claude-opus-4.5') realModel = 'claude-3-opus-20240229'
+      if (request.model === 'gpt-5.2-xhigh') realModel = 'gpt-4-turbo'
+      if (request.model === 'gemini-nano-banana-pro') realModel = 'gemini-1.5-pro-latest'
+
+      // 요청 객체 업데이트
+      const effectiveRequest = { ...request, model: realModel }
+
       switch (request.service) {
         case 'claude':
-          response = await this.callClaudeAPI(apiKey, request)
+          response = await this.callClaudeAPI(apiKey, effectiveRequest)
           break
         case 'openai':
-          response = await this.callOpenAIAPI(apiKey, request)
+          response = await this.callOpenAIAPI(apiKey, effectiveRequest)
           break
         case 'gemini':
-          response = await this.callGeminiAPI(apiKey, request)
+          response = await this.callGeminiAPI(apiKey, effectiveRequest)
           break
         default:
           throw new Error(`Unsupported service: ${request.service}`)
