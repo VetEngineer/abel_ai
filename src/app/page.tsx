@@ -274,9 +274,7 @@ export default function Home() {
                       <Button size="lg" variant="secondary" onClick={() => setShowDemo(true)} className="h-14 px-10 text-lg font-bold">
                         데모 체험하기
                       </Button>
-                      <Button size="lg" variant="outline" className="bg-transparent border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground hover:text-primary h-14 px-10 text-lg" asChild>
-                        <a href="/admin">관리자 설정</a>
-                      </Button>
+
                     </div>
                   </div>
                   <div className="absolute top-0 right-0 -mr-20 -mt-20 w-64 h-64 bg-accent/20 rounded-full blur-3xl" />

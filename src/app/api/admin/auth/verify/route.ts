@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { extractAdminTokenFromRequest, verifyAdminToken } from '@/lib/middleware/admin-auth'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     const token = extractAdminTokenFromRequest(request)

@@ -80,7 +80,6 @@ export default function Navbar({ onShowDemo, session }: NavbarProps) {
             <a href="#faq" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
               FAQ
             </a>
-            <Separator orientation="vertical" className="h-4" />
 
             {session ? (
               <Button variant="ghost" size="sm" onClick={handleLogoutClick} className="text-muted-foreground">
